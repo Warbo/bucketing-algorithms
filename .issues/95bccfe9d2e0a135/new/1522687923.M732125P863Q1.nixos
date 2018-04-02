@@ -1,0 +1,8 @@
+From: Chris Warburton
+Date: Mon, 02 Apr 2018 17:51:17 +0100
+State: new
+Subject: Focus on bucketing.
+Message-Id: <95bccfe9d2e0a135-0-artemis@nixos>
+
+This repo is now officially *just* about bucketing algorithms. We should
+rip out all of the quickspec-running stuff.
