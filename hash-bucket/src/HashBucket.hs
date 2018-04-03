@@ -1,4 +1,4 @@
-module Main where
+module HashBucket where
 
 import qualified Crypto.Hash           as Hash
 import qualified Data.Aeson            as Aeson

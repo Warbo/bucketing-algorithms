@@ -1,8 +1,8 @@
 # Commands which split their input into various "buckets", e.g. based on
 # clustering. We don't do any exploration or reduction, we just look at the
 # resulting buckets.
-{ bash, bc, cluster, format, jq, mkBin, ghc, runCommand, runWeka, stdenv,
-  withDeps, wrap, writeScript }:
+{ bash, bc, callPackage, cluster, format, jq, mkBin, ghc, runCommand, runWeka,
+  stdenv, withDeps, wrap, writeScript }:
 
 with rec {
   hashes = mkBin {
@@ -107,4 +107,5 @@ with rec {
 {
   inherit recurrent;
   hashes = withDeps [ hashCheck ] hashes;
+  hsHashes = callPackage ./hashBucket.nix {};
 }

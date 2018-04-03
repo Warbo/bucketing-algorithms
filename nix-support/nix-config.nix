@@ -9,8 +9,8 @@ with rec {
   stableSrc = fetchFromGitHub {
     owner  = "Warbo";
     repo   = "nix-config";
-    rev    = "796865f";
-    sha256 = "132v4w8a1lf99d8n7w743cq7rdqj5w56a10f9xa9vmqx2lazhzvx";
+    rev    = "4b86cd3";
+    sha256 = "1a7ji3y97xh963zhw2q7a7z62xr1zc5alp8k2835rqlkkq8h8zrx";
   };
 
   unstableSrc = (config { unstablePath = path; }).latestGit {

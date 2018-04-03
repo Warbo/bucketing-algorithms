@@ -17,7 +17,7 @@ fix (self: rec {
     nixpkgs
 
     # Fixed releases of nixpkgs. Useful for avoiding known incompatibilities.
-    nixpkgs-2016-03 nixpkgs-2016-09
+    nixpkgs-2016-03 nixpkgs-2016-09 nixpkgs1709
 
     # Default nixpkgs, overridden with helper functions and packages
     nix-config;
@@ -57,20 +57,15 @@ fix (self: rec {
   # argument values from the 'self' attrset.
   callPackage = nixpkgs.callPackage ./callPackage.nix { inherit self; };
 
-  analysis              = callPackage ./analysis.nix              {};
   asv-nix               = callPackage ./asv-nix.nix               {};
   buckets               = callPackage ./buckets.nix               {};
   callHackage           = callPackage ./callHackage.nix           {};
   checkHsEnv            = callPackage ./checkHsEnv.nix            {};
   checkStderr           = callPackage ./checkStderr.nix           {};
   cluster               = callPackage ./cluster.nix               {};
-  concurrentQuickspec   = callPackage ./concurrentQuickspec.nix   {};
-  dumpToNixScripts      = callPackage ./dumpToNix.nix             {};
-  extractedEnv          = callPackage ./extractedEnv.nix          {};
   extraHaskellPackages  = callPackage ./extraHaskellPackages.nix  {};
   filterToSampled       = callPackage ./filterToSampled.nix       {};
   format                = callPackage ./format.nix                {};
-  genQuickspecRunner    = callPackage ./genQuickspecRunner.nix    {};
   getDepsScript         = callPackage ./getDepsScript.nix         {};
   haskellPackages       = callPackage ./haskellPackages.nix       {};
   haskellPkgNameVersion = callPackage ./haskellPkgNameVersion.nix {};
@@ -85,11 +80,6 @@ fix (self: rec {
   nixEnv                = callPackage ./nixEnv.nix                {};
   package               = callPackage ./package.nix               {};
   pkgName               = callPackage ./pkgName.nix               {};
-  quickspec             = callPackage ./quickspec.nix             {};
-  quickspecAsts         = callPackage ./quickspecAsts.nix         {};
-  reduce-equations      = callPackage ./reduce-equations.nix      {};
-  renderEqs             = callPackage ./renderEqs.nix             {};
-  runTypesScriptData    = callPackage ./runTypesScript.nix        {};
   runWeka               = callPackage ./runWeka.nix               {};
   testData              = callPackage ./testData.nix              {};
   tipBenchmarks         = callPackage ./tipBenchmarks.nix         {};

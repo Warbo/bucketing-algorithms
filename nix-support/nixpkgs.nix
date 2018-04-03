@@ -29,6 +29,7 @@ assert pkgs ? nixpkgs1603 || abort "No nixpkgs1603 found";
 assert pkgs ? nixpkgs1609 || abort "No nixpkgs1609 found";
 rec {
   inherit pkgs;
+  inherit (pkgs) nixpkgs1709;
   nixpkgs-2016-03  = pkgs.nixpkgs1603;
   nixpkgs-2016-09  = pkgs.nixpkgs1609;
   nixpkgs          = get nixpkgs-2016-03             pkgs.unstable;
