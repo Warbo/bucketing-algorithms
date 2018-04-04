@@ -16,7 +16,7 @@
 # TEBenchmark.
 { fail, haskellPackages, haskellPkgToAsts, haskellPkgToRawAsts, jq, lib,
   makeHaskellPkgNixable, quickspec, quickspecAsts, runCommand,
-  stableHackageDb, tipBenchmarks, tipToHaskellPkg, unpack, withNix }:
+  stableHackageDb, tipToHaskellPkg, unpack, withNix }:
 
 with builtins;
 with lib;
@@ -145,10 +145,6 @@ rec {
     asts = commands.asts {
       name = "tip-benchmark";
       dir  = nixed;
-    };
-    nixed = commands.haskellNix {
-      name = "tip-benchmark-haskell";
-      dir  = tipBenchmarks.tip-benchmark-haskell;
     };
   };
 

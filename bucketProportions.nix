@@ -22,8 +22,8 @@ with { defs = rec {
     {
       script = wrap {
         name   = "script.rkt";
-        paths  = [ tipBenchmarks.tebench.env ];
-        vars   = tipBenchmarks.tebench.cache;
+        paths  = [ tebenchmark.tebench.env ];
+        vars   = tebenchmark.tebench.cache;
         script = ''
           #!/usr/bin/env racket
           #lang racket
@@ -170,8 +170,8 @@ with { defs = rec {
       inherit samples;
       script = wrap {
         name   = "ground-truths-of.rkt";
-        paths  = [ tipBenchmarks.tebench.env ];
-        vars   = tipBenchmarks.tebench.cache;
+        paths  = [ tebenchmark.tebench.env ];
+        vars   = tebenchmark.tebench.cache;
         script = ''
           #!/usr/bin/env racket
           #lang racket

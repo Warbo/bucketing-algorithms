@@ -2,7 +2,7 @@
 # than one place). Note that care should be taken to avoid infinite loops, since
 # 'callPackage' gets arguments from 'self', which is the set we're defining!
 {
-  lib    ? (import (import <nixpkgs> {}) { config = {}; }).lib,
+  lib    ? (import <nixpkgs> { config = {}; }).lib,
   stable ? true,
   ...
 }@args:
@@ -20,7 +20,10 @@ fix (self: rec {
     nixpkgs-2016-03 nixpkgs-2016-09 nixpkgs1709
 
     # Default nixpkgs, overridden with helper functions and packages
-    nix-config;
+    nix-config
+
+    # The version of nix-config we're using
+    nix-config-src;
 
   # Regular dependencies, used as-is
   inherit (nixpkgs)
@@ -42,7 +45,7 @@ fix (self: rec {
   # Helper functions, etc.
   inherit (nix-config)
     allDrvsIn asv attrsToDirs backtrace fail inNixedDir latestGit mkBin
-    nixListToBashArray nothing pipeToNix reverse sanitiseName stable
+    nixListToBashArray nothing pipeToNix repo reverse sanitiseName stable
     stableHackageDb stripOverrides timeout tryElse unlines unpack withDeps wrap;
 
   # Cases where we want both the attribute set and its attributes available
@@ -67,6 +70,7 @@ fix (self: rec {
   filterToSampled       = callPackage ./filterToSampled.nix       {};
   format                = callPackage ./format.nix                {};
   getDepsScript         = callPackage ./getDepsScript.nix         {};
+  hashBucket            = callPackage ./hashBucket.nix            {};
   haskellPackages       = callPackage ./haskellPackages.nix       {};
   haskellPkgNameVersion = callPackage ./haskellPkgNameVersion.nix {};
   haskellPkgToAsts      = callPackage ./haskellPkgToAsts.nix      {};
@@ -80,8 +84,8 @@ fix (self: rec {
   package               = callPackage ./package.nix               {};
   pkgName               = callPackage ./pkgName.nix               {};
   runWeka               = callPackage ./runWeka.nix               {};
+  tebenchmark           = callPackage ./tebenchmark.nix           {};
   testData              = callPackage ./testData.nix              {};
-  tipBenchmarks         = callPackage ./tipBenchmarks.nix         {};
   tipToHaskellPkg       = callPackage ./tipToHaskellPkg.nix       {};
   tryTip                = callPackage ./tryTip.nix                {};
   withNix               = callPackage ./withNix.nix               {};
