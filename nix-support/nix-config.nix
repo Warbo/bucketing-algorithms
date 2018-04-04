@@ -1,4 +1,4 @@
-{ fetchFromGitHub, path, stable }:
+{ fetchFromGitHub, stable }:
 
 with rec {
   config    = import "${configSrc}";
@@ -13,7 +13,7 @@ with rec {
     sha256 = "1a7ji3y97xh963zhw2q7a7z62xr1zc5alp8k2835rqlkkq8h8zrx";
   };
 
-  unstableSrc = (config { unstablePath = path; }).latestGit {
+  unstableSrc = (config { unstablePath = <nixpkgs>; }).latestGit {
     url    = http://chriswarbo.net/git/nix-config.git;
     stable = { unsafeSkip = true; };
   };

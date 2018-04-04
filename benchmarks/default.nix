@@ -64,7 +64,7 @@ with rec {
 mkBin {
   name  = "python";
   paths = [ py tipBenchmarks.tools ];
-  vars  = nixEnv // {
+  vars  = {
     HASKELL_PACKAGES      = noCompiling;
     NIX_EVAL_HASKELL_PKGS = noCompiling;
 

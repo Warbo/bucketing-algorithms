@@ -1,6 +1,6 @@
 { allDrvsIn, attrsToDirs, cabal-install, coreutils, extractedEnv,
   extraHaskellPackages, fail, haskellPackages, jq, lib, makeHaskellPkgNixable,
-  mkBin, nix, nixEnv, runCommand, testData, timeout, utillinux, withDeps, wrap,
+  mkBin, nix, runCommand, testData, timeout, utillinux, withDeps, wrap,
   writeScript }:
 with builtins;
 with lib;
@@ -13,7 +13,6 @@ with rec {
         name   = "explore-runner";
         paths  = [ fail haskellPackages.mlspec jq makeHaskellPkgNixable nix
                    timeout ];
-        vars   = nixEnv;
         script = ''
           #!/usr/bin/env bash
           set -e
@@ -97,7 +96,7 @@ with rec {
 
   checks = {
     mlspec-test = runCommand "mlspec-test"
-      (nixEnv // {
+      {
         buildInputs = [
           cabal-install
           (haskellPackages.ghcWithPackages (h: [ h.mlspec ]))
@@ -106,7 +105,7 @@ with rec {
           utillinux
         ];
         dir = haskellPackages.mlspec.src;
-      })
+      }
       ''
         set -e
         echo "Appeasing Cabal's impurities" 1>&2

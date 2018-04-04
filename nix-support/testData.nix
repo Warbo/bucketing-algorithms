@@ -15,7 +15,7 @@
 # fast. The only exception is when we're sampling, which obviously needs
 # TEBenchmark.
 { fail, haskellPackages, haskellPkgToAsts, haskellPkgToRawAsts, jq, lib,
-  makeHaskellPkgNixable, nixEnv, quickspec, quickspecAsts, runCommand,
+  makeHaskellPkgNixable, quickspec, quickspecAsts, runCommand,
   stableHackageDb, tipBenchmarks, tipToHaskellPkg, unpack, withNix }:
 
 with builtins;
@@ -52,14 +52,14 @@ rec {
       '';
 
     finalEqs = { name, pkg, script ? null }: runCommand "test-quickspec-${name}"
-      (nixEnv // {
+      {
         inherit pkg;
         buildInputs  = [ (if script == null then quickspec else script) ];
         IN_SELF_TEST = "1";
         MAX_SECS     = "180";
         MAX_KB       = "1000000";
         SKIP_NIX     = "1";
-      })
+      }
       ''
         set -e
         quickspec "$pkg" > "$out"

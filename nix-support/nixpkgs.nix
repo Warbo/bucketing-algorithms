@@ -7,19 +7,15 @@ with rec {
   # the latest versions of everything.
   stable = allArgs.stable or true;
 
-  # If we have a <real> path, use that as the source of fetchFromGitHub, to
-  # prevent an infinite loop. Otherwise use <nixpkgs> as normal.
-  path = import ./path.nix {};
-
   # nix-config defines a bunch of stable package sets we can use
-  inherit ((import path { config = {}; }).callPackage ./nix-config.nix {
-            inherit path stable;
+  inherit ((import <nixpkgs> { config = {}; }).callPackage ./nix-config.nix {
+            inherit stable;
           })
           nix-config;
 
   pkgs = nix-config {
     args         = removeAttrs allArgs [ "stable" ];
-    unstablePath = path;
+    unstablePath = <nixpkgs>;
   };
 
   get = s: us: if stable then s else us;

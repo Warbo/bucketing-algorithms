@@ -2,7 +2,7 @@
 # than one place). Note that care should be taken to avoid infinite loops, since
 # 'callPackage' gets arguments from 'self', which is the set we're defining!
 {
-  lib    ? (import (import ./path.nix {}) { config = {}; }).lib,
+  lib    ? (import (import <nixpkgs> {}) { config = {}; }).lib,
   stable ? true,
   ...
 }@args:
@@ -77,7 +77,6 @@ fix (self: rec {
   makeHaskellPkgNixable = callPackage ./makeHaskellPkgNixable.nix {};
   ML4HSFE               = callPackage ./ML4HSFE.nix               {};
   nixedHsPkg            = callPackage ./nixedHsPkg.nix            {};
-  nixEnv                = callPackage ./nixEnv.nix                {};
   package               = callPackage ./package.nix               {};
   pkgName               = callPackage ./pkgName.nix               {};
   runWeka               = callPackage ./runWeka.nix               {};

@@ -1,14 +1,14 @@
-{ fail, jq, nixEnv, runCommand }:
+{ fail, jq, runCommand }:
 
 { cmd, pkg }:
 runCommand "haveFields"
-  (nixEnv // {
+  {
     inherit cmd;
     buildInputs = [ fail jq pkg ];
     SIZE     = "3";
     MAX_KB   = "1000000";
     MAX_SECS = "180";
-  })
+  }
   ''
     WORKED=0
     for REP in $(seq 1 5)

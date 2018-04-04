@@ -1,5 +1,5 @@
 { annotated, bash, buckets, buildEnv, concurrentQuickspec, fail,
-  glibcLocales, jq, mlspecBench, nix, nixEnv, reduce-equations, runCommand,
+  glibcLocales, jq, mlspecBench, nix, reduce-equations, runCommand,
   stdenv, testData, timeout, tipBenchmarks, wrap, writeScript }:
 
 with builtins;

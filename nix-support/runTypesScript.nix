@@ -1,4 +1,4 @@
-{ bash, fail, haskellPackages, jq, lib, mkBin, nixEnv, withNix, wrap,
+{ bash, fail, haskellPackages, jq, lib, mkBin, withNix, wrap,
   writeScript }:
 
 with builtins;
@@ -10,7 +10,7 @@ with rec {
   repl = mkBin {
     name  = "repl";
     paths = (withNix {}).buildInputs ++ [ replLines ];
-    vars  = nixEnv // {
+    vars  = {
       cmd = "ghci -v0 -XTemplateHaskell";
       pkg =
         with {

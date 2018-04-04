@@ -1,5 +1,5 @@
 { bash, checkStderr, fail, gnugrep, gnused, haskellPackages, haveVar, jq,
-  makeWrapper, mkBin, nix, nixEnv, pipeToNix, runCommand, testData, timeout,
+  makeWrapper, mkBin, nix, pipeToNix, runCommand, testData, timeout,
   withDeps, withNix, wrap, writeScript }:
 
 with builtins;
@@ -10,7 +10,7 @@ with rec {
       bash jq nix
       (haskellPackages.ghcWithPackages (h: [ h.mlspec h.nix-eval ]))
     ];
-    vars   = nixEnv // {
+    vars   = {
       code = writeScript "getCmd.hs" ''
         {-# LANGUAGE OverloadedStrings #-}
         import           Data.Aeson
@@ -97,7 +97,7 @@ with rec {
       (haskellPackages.ghcWithPackages (h: [ h.mlspec h.nix-eval ]))
       fail haveVar jq nix pipeToNix
     ];
-    vars   = nixEnv // {
+    vars   = {
       inherit getCmd runner;
       NIX_EVAL_HASKELL_PKGS = builtins.toString ./quickspecEnv.nix;
       mkCmd = writeScript "quickspec-builder.nix" ''

@@ -1,5 +1,5 @@
 { bash, dumpToNixScripts, fail, haskellPkgNameVersion, inNixedDir, jq, lib,
-  makeHaskellPkgNixable, mkBin, nix, nixEnv, runCommand, testData, withDeps }:
+  makeHaskellPkgNixable, mkBin, nix, runCommand, testData, withDeps }:
 
 with builtins;
 with lib;
@@ -48,10 +48,10 @@ with rec {
   };
 
   testExamplePkg = n: asts: runCommand "testRawAstsOf-${n}"
-    (nixEnv // {
+    {
       inherit asts;
       buildInputs = [ fail jq ];
-    })
+    }
     ''
       set -o pipefail
       T=$(jq 'type' < "$asts") || fail "Couldn't get type of: $asts"
