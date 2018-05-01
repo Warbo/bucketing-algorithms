@@ -15,8 +15,8 @@
 # fast. The only exception is when we're sampling, which obviously needs
 # TEBenchmark.
 { fail, haskellPackages, haskellPkgToAsts, haskellPkgToRawAsts, jq, lib,
-  makeHaskellPkgNixable, quickspec, quickspecAsts, runCommand,
-  stableHackageDb, tipToHaskellPkg, unpack, withNix }:
+  makeHaskellPkgNixable, runCommand, stableHackageDb, tipToHaskellPkg, unpack,
+  withNix }:
 
 with builtins;
 with lib;
@@ -36,33 +36,6 @@ rec {
       ''
         set -e
         haskellPkgToAsts "$src" > "$out"
-      '';
-
-    eqs = { asts, name, nixed, script ? null }: runCommand "eqs-of-${name}"
-      {
-        inherit asts nixed;
-        buildInputs = [ (if script == null then quickspecAsts else script) ];
-        MAX_SECS    = "180";
-        MAX_KB      = "1000000";
-        SKIP_NIX    = "1";
-      }
-      ''
-        set -e
-        quickspecAsts "$nixed" < "$asts" > "$out"
-      '';
-
-    finalEqs = { name, pkg, script ? null }: runCommand "test-quickspec-${name}"
-      {
-        inherit pkg;
-        buildInputs  = [ (if script == null then quickspec else script) ];
-        IN_SELF_TEST = "1";
-        MAX_SECS     = "180";
-        MAX_KB       = "1000000";
-        SKIP_NIX     = "1";
-      }
-      ''
-        set -e
-        quickspec "$pkg" > "$out"
       '';
 
     haskellDrv = { dir, name, script ? null }: haskellPackages.callPackage
