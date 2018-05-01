@@ -1,24 +1,26 @@
-{ fetchFromGitHub, stable }:
+{ defaultVersion, fetchFromGitHub, stable }:
 
 with rec {
   # This is pinned to a revision of nix-config which should work for everyone
   stableCfg = rec {
-    nix-config     = import "${nix-config-src}" {};
+    nix-config     = import "${nix-config-src}" { inherit defaultVersion; };
 
     nix-config-src = fetchFromGitHub {
       owner  = "Warbo";
       repo   = "nix-config";
-      rev    = "1babef1";
-      sha256 = "1p0kn70l9a9i8r7318k1w51ncajcvw3vk0yln6b6r3yhfcdp51by";
+      rev    = "99bc878";
+      sha256 = "0q8f30vzvngnnvszxxp6vhr649y4lvix4r9axhvmpc9wr5afls6s";
     };
   };
 
   # Try taking <nix-config> from the environment, if given, or else from git
-  mkUnstableCfg =
+  unstableCfg =
     with builtins.tryEval <nix-config>;
     if success
        then rec {
-         nix-config     = import "${nix-config-src}" { stable = false; };
+         nix-config     = import "${nix-config-src}" {
+                            defaultVersion = "unstable";
+                          };
          nix-config-src = value;
        }
        else rec {
@@ -28,7 +30,7 @@ with rec {
 };
 
 # In the case that we're stable, or <nix-config> is provided, these act as a
-# sanity check to ensure the APIs used by mkUnstableCfg are still present
+# sanity check to ensure the APIs used by unstableCfg are still present
 assert stableCfg.nix-config ? latestNixCfg ||
        abort "nix-config is missing latestNixCfg";
 assert stableCfg.nix-config ? configSrc ||
