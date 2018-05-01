@@ -1,24 +1,8 @@
-# Haskell Theory Exploration Benchmarks #
+# Theory Exploration Bucketing Benchmarks #
 
-This directory contains benchmarks for automated theory exploration tools. There
-are two sorts of benchmarks:
-
-### Standalone Theories ##
-
-These are the files ending `.smt2`, and are written in the TIP format:
-
- - `benchmarks/nat-simple.smt2` is a simple theory of Natural numbers, with
-   addition and multiplication, comparable to that used in [1] and [2]
- - `benchmarks/nat-full.smt2` is similar to `nat-simple.smt2` but also contains
-   an exponentiation function, comparable to that used in [3]
- - `benchmarks/list-full.smt2` is a theory of lists, comparable to that used
-   in [2]
-
-The standalone benchmarks have a corresponding file in `ground-truth/`
-containing the statements considered "interesting" for that theory (these are
-taken from [1]).
-
-### Theory Exploration Benchmark ##
+This directory contains benchmarks for various algorithmic ways to divide up
+ASTS into "buckets", as a divide-and-conquer approach to improving theory
+exploration systems.
 
 We use the Theory Exploration Benchmark project, which includes a corpus of
 definitions and statements. Subsets of these definitions are sampled
@@ -61,13 +45,3 @@ programs).
 To use this lzipped data with asv, it can simply be unzipped into place. The
 benchmarking environment provides an `unzipBenchmarks` command which will do
 this for you.
-
-## References ##
-
-[1]: Automated discovery of inductive lemmas, Moa Johansson 2009
-
-[2]: Automating inductive proofs using theory exploration, Koen Claessen, Moa
-     Johansson, Dan Rosén and Nicholas Smallbone 2013
-
-[3]: Scheme-based theorem discovery and concept invention, Omar Montano-Rivas,
-     Roy McCasland, Lucas Dixon and Alan Bundy 2012

@@ -2,17 +2,19 @@
 # keep in mind that we make no guarantees about their stability.
 { args ? {}, bypassPublicApi ? false }:
 
-with rec {
-  # Implementation details
-  pkgs = import ./nix-support args;
+with {
+  defs = rec {
+    # Implementation details
+    pkgs = import ./nix-support args;
 
-  # Used for general performance testing, as well as formal evaluation
-  benchmarkEnv    = import ./benchmarkEnv.nix;
-  benchmarkRunner = import ./benchmarks { inherit pkgs; };
+    # Used for general performance testing, as well as formal evaluation
+    benchmarkEnv    = import ./benchmarkEnv.nix;
+    benchmarkRunner = import ./benchmarks { inherit pkgs; };
 
-  # Provides our exploration scripts
-  inherit (pkgs) package;
+    # Provides our exploration scripts
+    inherit (pkgs) package;
+  };
 };
 if bypassPublicApi
-   then { inherit benchmarkEnv benchmarkRunner package pkgs; }
-   else package
+   then defs
+   else defs.package
