@@ -1,26 +1,37 @@
 { fetchFromGitHub, stable }:
 
 with rec {
-  config    = import "${configSrc}";
+  # This is pinned to a revision of nix-config which should work for everyone
+  stableCfg = rec {
+    nix-config     = import "${nix-config-src}" {};
 
-  configSrc = with builtins.tryEval <nix-config>;
-              if success then value else stableSrc;
-
-  stableSrc = fetchFromGitHub {
-    owner  = "Warbo";
-    repo   = "nix-config";
-    rev    = "4b86cd3";
-    sha256 = "1a7ji3y97xh963zhw2q7a7z62xr1zc5alp8k2835rqlkkq8h8zrx";
+    nix-config-src = fetchFromGitHub {
+      owner  = "Warbo";
+      repo   = "nix-config";
+      rev    = "1babef1";
+      sha256 = "1p0kn70l9a9i8r7318k1w51ncajcvw3vk0yln6b6r3yhfcdp51by";
+    };
   };
 
-  unstableSrc = (config { unstablePath = <nixpkgs>; }).latestGit {
-    url    = http://chriswarbo.net/git/nix-config.git;
-    stable = { unsafeSkip = true; };
-  };
+  # Try taking <nix-config> from the environment, if given, or else from git
+  mkUnstableCfg =
+    with builtins.tryEval <nix-config>;
+    if success
+       then rec {
+         nix-config     = import "${nix-config-src}" { stable = false; };
+         nix-config-src = value;
+       }
+       else rec {
+         nix-config     = stableCfg.nix-config.latestNixCfg;
+         nix-config-src = nix-config.configSrc;
+       };
 };
 
-{
-  nix-config = if stable
-                  then config
-                  else import "${unstableSrc}";
-}
+# In the case that we're stable, or <nix-config> is provided, these act as a
+# sanity check to ensure the APIs used by mkUnstableCfg are still present
+assert stableCfg.nix-config ? latestNixCfg ||
+       abort "nix-config is missing latestNixCfg";
+assert stableCfg.nix-config ? configSrc ||
+       abort "nix-config is missing configSrc";
+
+if stable then stableCfg else unstableCfg
