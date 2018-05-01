@@ -1,0 +1,8 @@
+From: Chris Warburton
+Date: Tue, 01 May 2018 13:27:33 +0100
+Subject: Re: Focus on bucketing.
+Message-Id: <95bccfe9d2e0a135-b4b70dc8d80adf07-artemis@nixos>
+References: <95bccfe9d2e0a135-0-artemis@nixos>
+In-Reply-To: <95bccfe9d2e0a135-0-artemis@nixos>
+
+Looks basically done. We can clean up the rest as we go.
