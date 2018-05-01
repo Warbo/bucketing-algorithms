@@ -1,5 +1,5 @@
-{ annotated, bash, fail, haskellPackages,jq, lib, ML4HSFE, runCommand, runWeka,
-  testData, unpack, withDeps, wrap }:
+{ bash, fail, haskellPackages,jq, lib, ML4HSFE, runCommand, runWeka, testData,
+  unpack, withDeps, wrap }:
 
 with builtins;
 with lib;
