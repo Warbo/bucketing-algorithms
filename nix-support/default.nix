@@ -11,48 +11,45 @@ with builtins;
 with lib;
 
 fix (self: rec {
-  # Various versions of nixpkgs from which to get our packages
-  inherit (import ./nixpkgs.nix {})
-    # Whichever nixpkgs we're using by default (depending on 'stable')
-    nixpkgs
+  # Whether to use the latest packages or known-good versions
+  inherit stable;
 
-    # Fixed releases of nixpkgs. Useful for avoiding known incompatibilities.
-    nixpkgs-2016-03 nixpkgs-2016-09 nixpkgs1709
+  # The main nixpkgs repo, augmented with nix-config, depending on un/stable
+  inherit (import ./nixpkgs.nix { inherit stable; })
+    nix-config nix-config-src nixpkgs;
 
-    # Default nixpkgs, overridden with helper functions and packages
-    nix-config
-
-    # The version of nix-config we're using
-    nix-config-src;
-
-  # Regular dependencies, used as-is
   inherit (nixpkgs)
+    # Regular dependencies, used as-is
     bash buildEnv cabal-install glibcLocales jq lib runCommand stdenv utillinux
     writeScript;
 
+  inherit (nix-config)
+    # Pristine releases of nixpkgs. Useful for avoiding known incompatibilities.
+    nixpkgs1603 nixpkgs1609 nixpkgs1709
+
+    # Helper functions, etc.
+    allDrvsIn asv attrsToDirs backtrace fail inNixedDir latestGit mkBin
+    nixListToBashArray nothing pipeToNix repo reverse sanitiseName
+    stableHackageDb stripOverrides timeout tryElse unlines unpack withDeps wrap;
+
   # Fixed versions to avoid known breakages
-  inherit (nixpkgs-2016-03)
+
+  inherit (nixpkgs1603)
     # Args differ in new versions, which breaks ./haskellPackages.nix scripts
     cabal2nix;
 
-  inherit (nixpkgs-2016-09)
+  inherit (nixpkgs1609)
     # The quoting is different in other versions, which breaks e.g. wrap
     makeWrapper
 
     # Old versions don't have the needed contracts, new ones don't build on i686
     racket;
 
-  # Helper functions, etc.
-  inherit (nix-config)
-    allDrvsIn asv attrsToDirs backtrace fail inNixedDir latestGit mkBin
-    nixListToBashArray nothing pipeToNix repo reverse sanitiseName stable
-    stableHackageDb stripOverrides timeout tryElse unlines unpack withDeps wrap;
-
   # Cases where we want both the attribute set and its attributes available
-  inherit (callPackage ./annotate.nix {})
-    annotated annotateRawAstsFrom;
+
   inherit (dumpToNixScripts)
     dumpToNix;
+
   inherit (runTypesScriptData)
     runTypesScript;
 
