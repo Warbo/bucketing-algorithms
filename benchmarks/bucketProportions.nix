@@ -3,12 +3,9 @@
 #
 # Write output to JSON for archiving.
 with builtins;
-with import ./nix-support {};
+with import ../nix-support {};
 
-{ exposeDefs ? false }:  # Set to true to access definitions, e.g. to debug
-
-with { defs = rec {
-
+rec {
   maxSize = 100;
   reps    = 100;
 
@@ -256,7 +253,4 @@ with { defs = rec {
 
   result = groundTruthsOf withBuckets;
 
-}; };
-if exposeDefs
-   then defs
-   else defs.result
+}
