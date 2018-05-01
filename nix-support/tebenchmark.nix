@@ -1,9 +1,11 @@
-{ fetchgit, haskellPackages, nix-config-src, repo }:
+{ latestGit, haskellPackages, nix-config-src, repo }:
 
-import (fetchgit {
+import (latestGit {
   url    = http://chriswarbo.net/git/theory-exploration-benchmarks.git;
-  rev    = "eb9f5b9";
-  sha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+  stable = {
+    rev    = "eb9f5b9";
+    sha256 = "1jfqjc6s8lgp6ndqrhv4abzcsda2wrf2rwwj740y1lgam609wwzy";
+  };
 }) {
   inherit haskellPackages nix-config-src;
   pkgsPath = repo;
