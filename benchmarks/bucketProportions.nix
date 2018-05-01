@@ -2,12 +2,21 @@
 # proportion of ground truth theorems which apply to the resulting buckets.
 #
 # Write output to JSON for archiving.
-with builtins;
-with import ../nix-support {};
+{
+  # Parameters for the results
+  maxSize ? 100, reps ? 100,
 
-rec {
-  maxSize = 100;
-  reps    = 100;
+  # General dependencies, supplied by callPackage
+  buckets,
+  nixpkgs,
+  runCommand,
+  tebenchmark,
+  testData,
+  wrap
+}:
+with { inherit (builtins) concatStringSep; };
+rec  {
+  inherit maxSize reps;
 
   # Gather samples: run 'choose_sample size rep' for each size up to maxSize and
   # rep from 0 to reps-1. Returns an object mapping sizes to objects, where the
@@ -252,5 +261,4 @@ rec {
   withBuckets = addHashBuckets samples;
 
   result = groundTruthsOf withBuckets;
-
 }

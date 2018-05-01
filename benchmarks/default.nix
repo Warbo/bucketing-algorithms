@@ -4,19 +4,15 @@ args:
 with builtins;
 with import ../nix-support {};
 with lib;
-with rec {
-  parameters = {
-    max_size    = 20;
-    repetitions = 1;
-  };
-
-  py = nixpkgs-2016-09.python3.withPackages (p: []);
+with callPackage ./bucketProportions.nix {
+  maxSize = 20;
+  reps    = 10;
 };
 
 mkBin {
-  name  = "python";
-  paths = [ py ];
-  vars  = { parameters = toJSON parameters; };
+  name   = "python";
+  paths  = [ (nixpkgs1609.python3.withPackages (p: [])) ];
+  vars   = { inherit result; };
   script = ''
     #!/usr/bin/env bash
     exec python3 "$@"
