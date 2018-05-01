@@ -15,8 +15,7 @@
 # fast. The only exception is when we're sampling, which obviously needs
 # TEBenchmark.
 { fail, haskellPackages, haskellPkgToAsts, haskellPkgToRawAsts, jq, lib,
-  makeHaskellPkgNixable, runCommand, stableHackageDb, tipToHaskellPkg, unpack,
-  withNix }:
+  makeHaskellPkgNixable, runCommand, stableHackageDb, unpack, withNix }:
 
 with builtins;
 with lib;
@@ -59,26 +58,6 @@ rec {
           fail "Package $n failed to nixify"
         cp -r "$X" "$out"
       '';
-
-    haskellPkg = { name, script ? null, tip }:
-      runCommand "haskell-pkg-of-${name}"
-        {
-          inherit tip;
-          SKIP_NIX    = "1";
-          buildInputs = [ fail (if script == null
-                                   then tipToHaskellPkg
-                                   else script) ];
-        }
-        ''
-          set -e
-          D=$(tipToHaskellPkg < "$tip")
-          [[ -e "$D" ]] || fail "'$D' doesn't exist"
-
-          X=$(readlink -f "$D")
-          [[ -d "$X" ]] || fail "'$X' isn't dir"
-
-          cp -r "$X" "$out"
-        '';
   };
 
   # Selected example data for tests to use. These should be reasonably quick to

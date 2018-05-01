@@ -83,7 +83,6 @@ fix (self: rec {
   runWeka               = callPackage ./runWeka.nix               {};
   tebenchmark           = callPackage ./tebenchmark.nix           {};
   testData              = callPackage ./testData.nix              {};
-  tipToHaskellPkg       = callPackage ./tipToHaskellPkg.nix       {};
   tryTip                = callPackage ./tryTip.nix                {};
   withNix               = callPackage ./withNix.nix               {};
 })
