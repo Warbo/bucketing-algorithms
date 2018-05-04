@@ -28,9 +28,10 @@ fix (self: rec {
     nixpkgs1603 nixpkgs1609 nixpkgs1709
 
     # Helper functions, etc.
-    allDrvsIn asv attrsToDirs backtrace fail inNixedDir latestGit mkBin
-    nixListToBashArray nothing pipeToNix repo reverse sanitiseName
-    stableHackageDb stripOverrides timeout tryElse unlines unpack withDeps wrap;
+    allDrvsIn asv attrsToDirs backtrace composeWithArgs fail inNixedDir
+    latestGit mkBin nixListToBashArray nothing pipeToNix repo reverse
+    sanitiseName stableHackageDb stripOverrides timeout tryElse unlines unpack
+    withDeps wrap;
 
   # Fixed versions to avoid known breakages
 
@@ -50,6 +51,9 @@ fix (self: rec {
   inherit (dumpToNixScripts)
     dumpToNix;
 
+  inherit (haskellTE)
+    testData;
+
   inherit (runTypesScriptData)
     runTypesScript;
 
@@ -58,6 +62,7 @@ fix (self: rec {
   callPackage = nixpkgs.callPackage ./callPackage.nix { inherit self; };
 
   asv-nix               = callPackage ./asv-nix.nix               {};
+  benchmarkingCommands  = callPackage ./benchmarkingCommands.nix  {};
   buckets               = callPackage ./buckets.nix               {};
   callHackage           = callPackage ./callHackage.nix           {};
   checkHsEnv            = callPackage ./checkHsEnv.nix            {};
@@ -72,17 +77,18 @@ fix (self: rec {
   haskellPkgNameVersion = callPackage ./haskellPkgNameVersion.nix {};
   haskellPkgToAsts      = callPackage ./haskellPkgToAsts.nix      {};
   haskellPkgToRawAsts   = callPackage ./haskellPkgToRawAsts.nix   {};
+  haskellTE             = callPackage ./haskellTE.nix             {};
   haveVar               = callPackage ./haveVar.nix               {};
   hsNameVersion         = callPackage ./hsNameVersion.nix         {};
   hsOverride            = callPackage ./hsOverride.nix            {};
   makeHaskellPkgNixable = callPackage ./makeHaskellPkgNixable.nix {};
+  makeSamples           = callPackage ./makeSamples.nix           {};
   ML4HSFE               = callPackage ./ML4HSFE.nix               {};
   nixedHsPkg            = callPackage ./nixedHsPkg.nix            {};
   package               = callPackage ./package.nix               {};
   pkgName               = callPackage ./pkgName.nix               {};
   runWeka               = callPackage ./runWeka.nix               {};
   tebenchmark           = callPackage ./tebenchmark.nix           {};
-  testData              = callPackage ./testData.nix              {};
   tryTip                = callPackage ./tryTip.nix                {};
   withNix               = callPackage ./withNix.nix               {};
 })

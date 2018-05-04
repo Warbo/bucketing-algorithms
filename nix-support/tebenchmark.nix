@@ -7,7 +7,7 @@ import (latestGit {
     sha256 = "1jfqjc6s8lgp6ndqrhv4abzcsda2wrf2rwwj740y1lgam609wwzy";
   };
 }) {
-  inherit haskellPackages nix-config-src;
-  pkgsPath = repo;
-  pkgsArgs = { config = import "${nix-config-src}/custom.nix"; };
+  #inherit haskellPackages nix-config-src;
+  #pkgsPath = repo;
+  #pkgsArgs = { config = import "${nix-config-src}/custom.nix"; };
 }
