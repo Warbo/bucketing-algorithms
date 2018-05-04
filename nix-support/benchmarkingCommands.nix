@@ -7,26 +7,37 @@
 #  - The impact of the bucketing algorithms is measured, on lots of test data
 #  - The speed of the scripts is measured on small inputs, to aid us in
 #    optimising their implementation (since the above can be very slow!)
-{ buckets, jq, lib, nixpkgs, tebenchmark, testData, wrap }:
+{ bash, buckets, jq, lib, nixpkgs, tebenchmark, testData, wrap }:
 
 with builtins;
-{
+rec {
+  astsOf = wrap {
+    name   = "astsOf";
+    paths  = [ bash jq ];
+    vars   = { inherit (testData.tip-benchmark) asts; };
+    script = ''
+      #!/usr/bin/env bash
+      set -e
+
+      # Takes a JSON array of names, returns a JSON array of their ASTs
+      jq --slurpfile asts "$asts" \
+        'sort | map(. as $name | $asts[0] | map(select(.name == $name))) | add'
+    '';
+  };
+
   # Run the bucket script on each sample; we use a few bucket sizes, in
   # increments
   addHashBucketsCmd = wrap {
     name  = "hash";
     paths = [ buckets.hashes jq ];
     vars  = {
-      inherit (testData.tip-benchmark) asts;
+      inherit astsOf;
       sizes = concatStringsSep " " (map toString (lib.range 1 20));
     };
     script = ''
       #!/usr/bin/env bash
       set -e
-      INPUT=$(sort)
-       ASTS=$(jq -s --slurpfile asts "$asts" 'map($asts[0][.])')
-
-     echo -e "INPUT:\n$INPUT\n\nASTS:\n$ASTS\n\n" 1>&2
+      ASTS=$("$astsOf")
 
       for CLUSTER_SIZE in $sizes
       do
