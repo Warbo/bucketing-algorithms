@@ -31,14 +31,19 @@
 
     // The matrix of dependencies to test.  Each key is the name of a
     // dependency and the values distinguish different versions. These will be
-    // given as arguments to the builders.
+    // given as arguments to the builders. There's only one 'dir', so we use
+    // 'null' as the version.
     "matrix": { "dir": [ "null" ] },
 
-    // These build the dependencies specified in matrix
+    // These build the dependencies specified in matrix. 'dir' is the path of
+    // the checkout that's being benchmarked, i.e. the git revisions managed by
+    // asv.
     "builders": { "dir": "args: args.dir" },
 
-    // This builds the benchmarking environment
-    "installer": "args: import ''${args.dir}/benchmarks'' args",
+    // This builds the benchmarking environment. We take its definitions from
+    // 'root', which is the checkout we're running from (i.e. $PWD). This
+    // ensures that every revision will be benchmarked in the same way.
+    "installer": "args: import ''${args.root}/benchmarks'' args",
 
     // The directory (relative to the current directory) that benchmarks are
     // stored in

@@ -2,6 +2,7 @@ from json       import dumps, loads
 from os         import getenv
 from parameters import reps, sizes
 from subprocess import PIPE, Popen
+from timeit     import default_timer
 from util       import tip_benchmarks, tip_cache
 
 cmd = loads(os.getenv('commands'))['addHashBucketsCmd']
@@ -20,3 +21,4 @@ def time_hashing():
         for rep in samples[size]:
             call_cmd(samples[size][rep]['sample'])
 time_hashing.setup = parse_samples
+time_hashing.timer = default_timer  # Measure wall-clock rather than CPU time
