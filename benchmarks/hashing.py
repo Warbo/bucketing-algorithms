@@ -1,18 +1,22 @@
+from json       import dumps, loads
 from os         import getenv
 from parameters import reps, sizes
+from subprocess import PIPE, Popen
 from util       import tip_benchmarks, tip_cache
 
-# Benchmark parameters. Will appear in alphabetical order as arguments, after
-# 'cache'
-args = {
-    'rep'  : reps,
-    'size' : sizes,
-}
+cmd = loads(os.getenv('commands'))['addHashBucketsCmd']
 
-#setup_cache = tip_cache(
-#    'hs',
-#    args,
-#    lambda stdout: ([getenv('hsTipRunner')], stdout))
+samples = None
+def parse_samples():
+    with open(os.getenv('samples'), 'r') as f:
+        samples = loads(f.read())
 
-# Generate benchmark functions and add them to this module
-#locals().update(tip_benchmarks(args))
+def call_cmd(sample):
+    p = Popen([cmd], stdin=PIPE, stdout=PIPE, stderr=PIPE)
+    p.communicate(dumps(sample))
+
+def time_hashing():
+    for size in samples:
+        for rep in samples[size]:
+            call_cmd(samples[size][rep]['sample'])
+time_hashing.setup = parse_samples
