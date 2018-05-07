@@ -36,14 +36,14 @@
     "matrix": { "dir": [ "null" ] },
 
     // These build the dependencies specified in matrix. 'dir' is the path of
-    // the checkout that's being benchmarked, i.e. the git revisions managed by
-    // asv.
+    // the checkout we're running from, i.e. the rev doing the measuring, not
+    // the rev being measured.
     "builders": { "dir": "args: args.dir" },
 
     // This builds the benchmarking environment. We take its definitions from
-    // 'root', which is the checkout we're running from (i.e. $PWD). This
+    // 'dir', which is the checkout we're running from (i.e. $PWD). This
     // ensures that every revision will be benchmarked in the same way.
-    "installer": "args: import ''${args.root}/benchmarks'' args",
+    "installer": "args: import ''${args.dir}/benchmarks'' args",
 
     // The directory (relative to the current directory) that benchmarks are
     // stored in

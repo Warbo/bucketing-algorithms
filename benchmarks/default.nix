@@ -1,18 +1,19 @@
 # Builds the environment in which to run a benchmark. This will be called from
 # asv, passing in dependencies as arguments.
 {
-  dir,  # Path to the revision being benchmarked
+  dir,  # Path to the revision containing the benchmarks
+  root, # Path to the revision being benchmarked
   ...
 }:
 
-with builtins;
 with {
-  fixed    = import ../nix-support {};
-  measured = import "${dir}/nix-support" {};
+  fixed    = import "${dir }/nix-support" {};
+  measured = import "${root}/nix-support" {};
 };
-with lib;
+with builtins;
+with fixed.lib;
 
-mkBin {
+fixed.mkBin {
   name  = "python3";
   paths = [ (fixed.nixpkgs1609.python3.withPackages (p: [])) ];
   vars  = {
