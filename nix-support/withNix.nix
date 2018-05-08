@@ -1,4 +1,4 @@
-{ bash, coreutils, jq, lib, nix, perl, procps, runCommand, utillinux }:
+{ bash, coreutils, jq, nix, perl, procps, utillinux }:
 with builtins;
 with rec {
   commonDeps = [ bash coreutils jq nix perl procps utillinux ];

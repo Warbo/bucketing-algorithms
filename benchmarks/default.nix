@@ -7,14 +7,14 @@
 }:
 
 with {
-  fixed    = import "${dir }/nix-support" {};
-  measured = import "${root}/nix-support" {};
+  fixed    = import "${dir}/../nix-support" {};
+  measured = import "${root  }/nix-support" {};
 };
 with builtins;
 with fixed.lib;
 
-fixed.mkBin {
-  name  = "python3";
+trace (toJSON { inherit dir root; }) fixed.mkBin {
+  name  = "python";
   paths = [ (fixed.nixpkgs1609.python3.withPackages (p: [])) ];
   vars  = {
     # All of the scripts to benchmark should be in here, taken from measured

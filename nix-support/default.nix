@@ -61,7 +61,6 @@ fix (self: rec {
   # argument values from the 'self' attrset.
   callPackage = nixpkgs.callPackage ./callPackage.nix { inherit self; };
 
-  asv-nix               = callPackage ./asv-nix.nix               {};
   benchmarkingCommands  = callPackage ./benchmarkingCommands.nix  {};
   buckets               = callPackage ./buckets.nix               {};
   callHackage           = callPackage ./callHackage.nix           {};
