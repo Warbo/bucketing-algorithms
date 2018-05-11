@@ -43,7 +43,7 @@
     // This builds the benchmarking environment. We take its definitions from
     // 'dir', which is the checkout we're running from (i.e. $PWD). This
     // ensures that every revision will be benchmarked in the same way.
-    "installer": "args: import ''${args.dir}'' args",
+    "installer": "args: import ''${args.dir}/env.nix'' args",
 
     // The directory (relative to the current directory) that benchmarks are
     // stored in
