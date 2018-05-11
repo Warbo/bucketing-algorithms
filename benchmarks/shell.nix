@@ -1,9 +1,13 @@
 with import ../nix-support {};
+with {
+  asv-nix = callPackage ./asv-nix.nix {};
+  fixHtml = callPackage ./fixHtml.nix {};
+};
 stdenv.mkDerivation (nix-config.withNix {
   name         = "haskell-te-benchmark-env";
   src          = ./shell.nix;
   unpackPhase  = "true";
-  buildInputs  = [ (callPackage ./asv-nix.nix {}) nixpkgs1609.git ];
+  buildInputs  = [ asv-nix fixHtml nixpkgs1609.git ];
   installPhase = ''
     set -e
     echo 'WARNING: Building the "benchmarkEnv" derivation. This is not meant
@@ -13,5 +17,6 @@ stdenv.mkDerivation (nix-config.withNix {
   '';
   shellHook = ''
     echo "Entered benchmarking shell: use 'asv' command to run benchmarks." 1>&2
+    echo "If 'asv publish' output is broken, try the 'fixHtml' command."    1>&2
   '';
 })
