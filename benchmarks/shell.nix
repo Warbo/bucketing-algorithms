@@ -1,10 +1,13 @@
+# Provides the asv command and dependencies for running benchmarks. If this
+# derivation is built, it will run the benchmarks with some default options. If
+# it's used with nix-shell, the commands will be made available for use with
+# custom options.
 with import ../nix-support {};
 with {
   asv-nix = callPackage ./asv-nix.nix {};
   fixHtml = callPackage ./fixHtml.nix {};
 };
-stdenv.mkDerivation (nix-config.withNix {
-  name         = "haskell-te-benchmark-env";
+runCommand "haskell-te-benchmark" (nix-config.withNix {
   src          = ./shell.nix;
   unpackPhase  = "true";
   buildInputs  = [ asv-nix fixHtml nixpkgs1609.git ];

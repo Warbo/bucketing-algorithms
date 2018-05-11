@@ -1,11 +1,36 @@
 {
     "hashing.time_hashing": {
-        "code": "def time_hashing():\n    for size in samples:\n        for rep in samples[size]:\n            call_cmd(samples[size][rep])\n",
+        "code": "def time_hashing(size):\n    for rep in samples[size]:\n        stderr.write('Running rep {0}\\n'.format(str(rep)))\n        call_cmd(samples[size][rep])\n        break\n",
         "goal_time": 0.1,
         "name": "hashing.time_hashing",
         "number": 0,
-        "param_names": [],
-        "params": [],
+        "param_names": [
+            "size"
+        ],
+        "params": [
+            [
+                "'1'",
+                "'10'",
+                "'11'",
+                "'12'",
+                "'13'",
+                "'14'",
+                "'15'",
+                "'16'",
+                "'17'",
+                "'18'",
+                "'19'",
+                "'2'",
+                "'20'",
+                "'3'",
+                "'4'",
+                "'5'",
+                "'6'",
+                "'7'",
+                "'8'",
+                "'9'"
+            ]
+        ],
         "pretty_name": "hashing.time_hashing",
         "repeat": 0,
         "timeout": 60.0,
