@@ -5,9 +5,9 @@ with rec {
       args            = { inherit stable; };
       bypassPublicApi = true;
     };
-    # Remove unbuildable 'override' and 'overrideDerivation' attributes
     pkgs.stripOverrides {
-      inherit benchmarkEnv benchmarkRunner package;
+      inherit package;
+      benchmark = import ./benchmarks { inherit stable; };
     };
 };
 {
