@@ -13,7 +13,7 @@ with {
 with builtins;
 with fixed.lib;
 
-trace (toJSON { inherit dir root; }) fixed.mkBin {
+fixed.mkBin {
   name  = "python";
   paths = [ (fixed.nixpkgs1609.python3.withPackages (p: [])) ];
   vars  = {
