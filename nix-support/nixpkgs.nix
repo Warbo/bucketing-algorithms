@@ -4,7 +4,7 @@
 with builtins;
 with rec {
   # The release of nixpkgs we should use by default
-  defaultVersion = if stable then "nixpkgs1603" else "unstable";
+  defaultVersion = "nixpkgs1603";
 
   # nix-config defines a bunch of package sets we can use
   configured = (import <nixpkgs> { config = {}; }).callPackage ./nix-config.nix
@@ -14,5 +14,6 @@ with rec {
 configured // {
   # As well as the overridden packages, we also provide a pristine version of
   # our default nixpkgs set
-  nixpkgs = getAttr defaultVersion configured.nix-config;
+  nixpkgs = getAttr (if stable then defaultVersion else "unstable")
+                    configured.nix-config;
 }

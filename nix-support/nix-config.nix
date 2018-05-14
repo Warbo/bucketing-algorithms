@@ -24,7 +24,9 @@ with rec {
          nix-config-src = value;
        }
        else rec {
-         nix-config     = stableCfg.nix-config.latestNixCfg;
+         nix-config     = import <nixpkgs> {
+                            config = stableCfg.nix-config.latestNixCfg;
+                          };
          nix-config-src = nix-config.configSrc;
        };
 };
