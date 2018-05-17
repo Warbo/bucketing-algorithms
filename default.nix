@@ -8,8 +8,7 @@ with {
     pkgs = import ./nix-support args;
 
     # Used for general performance testing, as well as formal evaluation
-    benchmarkEnv    = import ./benchmarkEnv.nix;
-    benchmarkRunner = import ./benchmarks { inherit pkgs; };
+    benchmarkRunner = import ./benchmarks;
 
     # Provides our exploration scripts
     inherit (pkgs) package;
