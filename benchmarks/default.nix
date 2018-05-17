@@ -1,8 +1,7 @@
 # Runs the benchmarks with some default options. Can also be used with nix-shell
 # to enter a shell suitable for custom benchmark invocations.
-args:
 with builtins;
-with import ../nix-support args;
+with import ../nix-support {};
 with {
   asv-nix = callPackage ./asv-nix.nix {};
   fixHtml = callPackage ./fixHtml.nix {};

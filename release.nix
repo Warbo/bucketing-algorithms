@@ -5,10 +5,10 @@ with rec {
       args            = { inherit stable; };
       bypassPublicApi = true;
     };
-    pkgs.stripOverrides {
-      inherit package;
-      benchmark = import ./benchmarks { inherit stable; };
-    };
+    pkgs.stripOverrides
+      ({ inherit package; } // (if stable
+                                   then { benchmark = import ./benchmarks; }
+                                   else {}));
 };
 {
   stable   = go true;
