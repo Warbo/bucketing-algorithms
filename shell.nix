@@ -64,6 +64,6 @@ runCommand "haskell-te-benchmark"
     fixHtml .asv/html
 
     mkdir "$out"
-    cp -r ../.asv/html    "$out/"
-    cp -r ../.asv/results "$out/"
+    cp -r .asv/html    "$out/"
+    cp -r .asv/results "$out/"
   ''
