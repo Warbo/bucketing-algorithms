@@ -61,7 +61,7 @@ runCommand "haskell-te-benchmark"
     asv publish --environment "existing:$existing/bin/python"
 
     # Make reports work as standalone files (no HTTP server, no 3rd-party stuff)
-    fixHtml ../.asv/html
+    fixHtml .asv/html
 
     mkdir "$out"
     cp -r ../.asv/html    "$out/"
