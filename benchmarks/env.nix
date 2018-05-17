@@ -6,11 +6,11 @@
   ...
 }:
 
-with {
-  fixed    = import "${dir}/../nix-support" {};
-  measured = import "${root  }/nix-support" {};
-};
 with builtins;
+with trace (toJSON { inherit dir root; }) {
+  fixed    = import "${dir }/nix-support" {};
+  measured = import "${root}/nix-support" {};
+};
 with fixed.lib;
 
 fixed.mkBin {

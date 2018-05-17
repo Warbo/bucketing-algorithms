@@ -1,18 +1,18 @@
 # Runs the benchmarks with some default options. Can also be used with nix-shell
 # to enter a shell suitable for custom benchmark invocations.
 with builtins;
-with import ../nix-support {};
+with import ./nix-support {};
 with {
-  asv-nix = callPackage ./asv-nix.nix {};
-  fixHtml = callPackage ./fixHtml.nix {};
+  asv-nix = callPackage ./benchmarks/asv-nix.nix {};
+  fixHtml = callPackage ./benchmarks/fixHtml.nix {};
 };
 runCommand "haskell-te-benchmark"
   (nix-config.withNix {
     buildInputs  = [ asv-nix fixHtml nixpkgs1609.git nixpkgs1609.rsync ];
 
-    existing     = import ./env.nix {
-      dir  = "${./..}/benchmarks";
-      root = ./..;
+    existing     = import ./benchmarks/env.nix {
+      dir  = ./.;
+      root = ./.;
     };
     msg = ''
       Benchmarking shell: use the 'asv' command to run benchmarks. If you want
@@ -27,7 +27,7 @@ runCommand "haskell-te-benchmark"
       via 'file://' URLs. To fix this, you can run 'fixHtml /path/to/html/dir'.
     '';
     shellHook = "echo \"$msg\" 1>&2";
-    source    = ../.;
+    source    = ./.;
   })
   ''
     export HOME="$PWD/home"
@@ -40,7 +40,7 @@ runCommand "haskell-te-benchmark"
              --exclude .issues     \
              "$source"/ ./src
     chmod +w -R ./src
-    cd ./src/benchmarks
+    cd ./src
 
     # We don't copy .git, since Nix might have removed it anyway (for
     # reproducibility), so we only benchmark the checked-out revision.
@@ -56,8 +56,6 @@ runCommand "haskell-te-benchmark"
     echo "Run all benchmarks in pre-build environment" 1>&2
     asv run --show-stderr --machine default \
                           --environment "existing:$existing/bin/python"
-
-    find ..
 
     echo "Generating HTML reports" 1>&2
     asv publish --environment "existing:$existing/bin/python"

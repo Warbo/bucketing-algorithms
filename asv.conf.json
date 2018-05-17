@@ -43,21 +43,21 @@
     // This builds the benchmarking environment. We take its definitions from
     // 'dir', which is the checkout we're running from (i.e. $PWD). This
     // ensures that every revision will be benchmarked in the same way.
-    "installer": "args: import ''${args.dir}/env.nix'' args",
+    "installer": "args: import ''${args.dir}/benchmarks/env.nix'' args",
 
     // The directory (relative to the current directory) that benchmarks are
     // stored in
-    "benchmark_dir": ".",
+    "benchmark_dir": "./benchmarks",
 
     // The directory (relative to the current directory) to cache the Python
     // environments in
-    "env_dir": "../.asv/env",
+    "env_dir": ".asv/env",
 
     // The directory (relative to the current directory) that raw benchmark
     // results are stored in
-    "results_dir": "../.asv/results",
+    "results_dir": ".asv/results",
 
     // The directory (relative to the current directory) that the html tree
     // should be written to
-    "html_dir": "../.asv/html"
+    "html_dir": ".asv/html"
 }

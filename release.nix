@@ -7,7 +7,7 @@ with rec {
     };
     pkgs.stripOverrides
       ({ inherit package; } // (if stable
-                                   then { benchmark = import ./benchmarks; }
+                                   then { benchmark = import ./shell.nix; }
                                    else {}));
 };
 {
