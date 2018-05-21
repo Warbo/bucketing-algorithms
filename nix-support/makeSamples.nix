@@ -33,4 +33,4 @@ with {
     '';
 };
 
-composeWithArgs deduper dupeSamples
+{ maxSize ? null, reps, sizes ? null }@args: deduper (dupeSamples args)
