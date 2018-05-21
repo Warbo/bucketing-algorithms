@@ -24,8 +24,8 @@ fixed.mkBin {
 
     # A fixed set of samples, for scripts which need them as input
     samples = fixed.makeSamples {
-      maxSize = 20;  ## FIXME: Take sizes 1, 5, 10, 15, 20; not all (allow sizes XOR maxSize)
-      reps    = 5;
+      sizes = [ 1 5 10 15 20 ];
+      reps  = 5;
     };
   };
   script = ''

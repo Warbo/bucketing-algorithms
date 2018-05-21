@@ -8,15 +8,18 @@ with {
   # because we will end up with duplicate samples for small sizes. We do the
   # looping in Racket so we can call the sampler without the overhead of
   # invoking a fresh Racket process each time.
-  dupeSamples = { maxSize, reps }: runCommand "samples-with-dupes.json"
-    {
-      inherit (benchmarkingCommands) makeDupeSamples;
-      maxSize = toString maxSize;
-      reps    = toString reps;
-    }
-    ''
-      "$makeDupeSamples" > "$out"
-    '';
+  dupeSamples = { maxSize ? null, reps, sizes ? null }:
+    assert maxSize == null -> isList sizes   || abort "Need maxSize XOR sizes";
+    assert sizes   == null -> isInt  maxSize || abort "Need sizes XOR maxSize";
+    runCommand "samples-with-dupes.json"
+      {
+        inherit (benchmarkingCommands) makeDupeSamples;
+        maxSize = toString maxSize;
+        reps    = toString reps;
+      }
+      ''
+        "$makeDupeSamples" > "$out"
+      '';
 
   # Deduplicate the raw samples: duplicates are replaced with null, whilst
   # non-duplicates are set as the "sample" key of an object.
