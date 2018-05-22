@@ -21,11 +21,12 @@ def call_cmd(sample):
     p.communicate(sample.encode('utf-8'))
 
 def time_hashing(size):
-    for rep in samples[size]:
+    key = str(size)
+    for rep in samples[key]:
         stderr.write('Running rep {0}\n'.format(str(rep)))
-        call_cmd(samples[size][rep])
+        call_cmd(samples[key][rep])
         break
 
 time_hashing.param_names = ['size']
-time_hashing.params      = [sorted(samples.keys())]
+time_hashing.params      = [sorted([int(s) for s in samples.keys()])]
 time_hashing.timer       = default_timer  # Wall-clock rather than CPU time
