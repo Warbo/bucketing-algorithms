@@ -9,12 +9,15 @@ with {
   # looping in Racket so we can call the sampler without the overhead of
   # invoking a fresh Racket process each time.
   dupeSamples = { maxSize ? null, reps, sizes ? null }:
-    assert maxSize == null -> isList sizes   || abort "Need maxSize XOR sizes";
-    assert sizes   == null -> isInt  maxSize || abort "Need sizes XOR maxSize";
+    assert !(maxSize == null && sizes == null) || abort "No maxSize XOR sizes";
+    assert maxSize == null -> isList sizes     || abort "sizes should be list";
+    assert maxSize == null -> all isInt sizes  || abort "sizes should be ints";
+    assert sizes   == null -> isInt  maxSize   || abort "maxSize should be int";
     runCommand "samples-with-dupes.json"
       {
         inherit (benchmarkingCommands) makeDupeSamples;
-        maxSize = toString maxSize;
+        maxSize = if maxSize == null then null else toJSON maxSize;
+        sizes   = if sizes   == null then null else toJSON sizes;
         reps    = toString reps;
       }
       ''
