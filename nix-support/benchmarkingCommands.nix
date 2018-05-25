@@ -12,19 +12,41 @@
 
 with builtins;
 rec {
-  astsOf = wrap {
-    name   = "astsOf";
-    paths  = [ bash jq ];
-    vars   = { inherit (testData.tip-benchmark) asts; };
-    script = ''
-      #!/usr/bin/env bash
-      set -e
+  astsOf =
+    with rec {
+      script = wrap {
+        name   = "astsOf";
+        paths  = [ bash jq ];
+        vars   = { inherit (testData.tip-benchmark) asts; };
+        script = ''
+          #!/usr/bin/env bash
+          set -e
 
-      # Takes a JSON array of names, returns a JSON array of their ASTs
-      jq --slurpfile asts "$asts" \
-        'sort | map(. as $name | $asts[0] | map(select(.name == $name))) | add'
-    '';
-  };
+          # Takes a JSON array of names, returns a JSON array of their ASTs
+          jq --slurpfile asts "$asts" \
+            'sort | map(. as $name | $asts[0] | map(select(.name == $name))) |
+                    add'
+        '';
+      };
+
+      test = runCommand "test-astsOf"
+        {
+          inherit script;
+          buildInputs = [ fail jq tebenchmark.tools ];
+        }
+        ''
+          S=$(choose_sample 5 10)                    || fail "Didn't sample"
+          I=$(echo "$S" | jq -R '.' | jq -s '.')     || fail "Didn't wrap"
+          O=$(echo "$I" | "$script")                 || fail "Didn't get ASTs"
+          echo "$O" | jq -e 'type | . == "array"'    || fail "$O\nNot object"
+          echo "$O" | jq -e 'length | . == 5'        || fail "$O\nNot 5 ASTs"
+          echo "$O" | jq --argjson i "$I" \
+                         'map(.name) | sort | . == ($i | sort)' ||
+            fail "Input:\n$I\n\nOutput:\n$O\n\nMismatching names"
+          mkdir "$out"
+        '';
+    };
+    withDeps [ test ] script;
 
   # Run the bucket script on each sample; we use a few bucket sizes, in
   # increments
