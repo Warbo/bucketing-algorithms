@@ -18,17 +18,18 @@ rec {
         {
           buildInputs = [
             (haskellPackages.ghcWithPackages (h: [
-              h.aeson
+              h.aeson h.bytestring h.containers h.text h.th-lift-instances
             ]))
           ];
-          main = writeScript "Main.hs" ''
+          helpers = writeScript "Helpers.hs" ''
             {-# LANGUAGE OverloadedStrings #-}
+            module Helpers where
             import Control.Monad (mzero)
             import qualified Data.Aeson                 as Aeson
             import qualified Data.ByteString.Lazy.Char8 as BS
             import qualified Data.Map.Lazy              as Map
-            import qualified Data.Text                  as T
-            import qualified System.IO.Unsafe
+            import qualified Data.Text.Lazy             as T
+            import qualified Data.Text.Lazy.Encoding    as TE
 
             -- Data types and JSON parsers/printers
 
@@ -37,7 +38,7 @@ rec {
             instance Aeson.FromJSON Name where
               parseJSON x = Name <$> Aeson.parseJSON x
 
-            newtype AST = AST  Aeson.Object
+            newtype AST = AST { unAST :: T.Text }
 
             instance Aeson.ToJSON AST where
               toJSON (AST x) = Aeson.toJSON x
@@ -47,19 +48,39 @@ rec {
             type ASTMap = Map.Map Name AST
 
             instance Aeson.FromJSON NamedAST where
-              parseJSON (Aeson.Object o) = do n <- o Aeson..: "name"
-                                              pure (NAST (n, AST o))
-              parseJSON _                = mzero
+              parseJSON j = case j of
+                  Aeson.Object o -> do n <- o Aeson..: "name"
+                                       pure (NAST (n, objectToAST o))
+                  _              -> mzero
+                where objectToAST = AST . TE.decodeUtf8 . Aeson.encode
 
-            -- Maps names to their ASTs/metadata, reading from a known file
-            astMap :: ASTMap
-            astMap = Map.fromList (map unNamed asts)
+            -- Parses a JSON array of ASTs from the given ByteString and creates
+            -- a map from names to ASTs
+            mkASTMap :: BS.ByteString -> ASTMap
+            mkASTMap encoded = Map.fromList (map unNamed asts)
               where asts :: [NamedAST]
                     asts = case Aeson.eitherDecode encoded of
                                 Left err -> error err
                                 Right xs -> xs
-                    encoded = System.IO.Unsafe.unsafePerformIO
-                                (BS.readFile "${testData.tip-benchmark.asts}")
+          '';
+          main = writeScript "Main.hs" ''
+            {-# LANGUAGE OverloadedStrings #-}
+            {-# LANGUAGE TemplateHaskell   #-}
+            module Main where
+            import qualified Data.Aeson                 as Aeson
+            import qualified Data.ByteString.Lazy.Char8 as BS
+            import qualified Data.Map.Lazy              as Map
+            import qualified Data.Text.Lazy             as T
+            import qualified Data.Text.Lazy.Encoding    as TE
+            import Helpers
+            import Instances.TH.Lift  -- So we can 'lift' a Map
+            import Language.Haskell.TH.Syntax (lift, runIO)
+            import System.IO.Unsafe
+
+            -- Runs mkASTMap on a known source of ASTs
+            astMap :: ASTMap
+            astMap = mkASTMap
+              (unsafePerformIO (BS.readFile "${testData.tip-benchmark.asts}"))
 
             -- Parse, lookup, print
 
@@ -72,12 +93,17 @@ rec {
               where namesToAsts :: BS.ByteString -> BS.ByteString
                     namesToAsts s = case Aeson.eitherDecode s of
                                          Left err -> error err
-                                         Right ns -> Aeson.encode
-                                                       (astsOf ns)
+                                         Right ns -> render (astsOf ns)
+                    render = TE.encodeUtf8       .
+                             (`T.snoc` ']')      .
+                             T.cons '['          .
+                             T.intercalate ",\n" .
+                             map unAST
           '';
         }
         ''
-          cp "$main" Main.hs
+          cp "$helpers" Helpers.hs
+          cp "$main"    Main.hs
           ghc --make Main.hs -o "$out"
         '';
 
