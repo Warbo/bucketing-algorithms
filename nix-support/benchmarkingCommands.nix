@@ -75,12 +75,15 @@ rec {
             import Helpers
             import Instances.TH.Lift  -- So we can 'lift' a Map
             import Language.Haskell.TH.Syntax (lift, runIO)
-            import System.IO.Unsafe
 
             -- Runs mkASTMap on a known source of ASTs
             astMap :: ASTMap
-            astMap = mkASTMap
-              (unsafePerformIO (BS.readFile "${testData.tip-benchmark.asts}"))
+            astMap = Map.fromList (map (\(n, a) -> (Name n, AST a))
+              $(do let f = "${testData.tip-benchmark.asts}"
+                   bs <- runIO (BS.readFile f)
+                   let m = mkASTMap bs
+                       l = Map.toList m
+                   lift (map (\(n, a) -> (unName n, unAST a)) l)))
 
             -- Parse, lookup, print
 
