@@ -7,27 +7,79 @@
 #  - The impact of the bucketing algorithms is measured, on lots of test data
 #  - The speed of the scripts is measured on small inputs, to aid us in
 #    optimising their implementation (since the above can be very slow!)
-{ bash, buckets, fail, jq, lib, nixpkgs, runCommand, tebenchmark, testData,
-  withDeps, wrap }:
+{ bash, buckets, fail, haskellPackages, jq, lib, nixpkgs, runCommand,
+  tebenchmark, testData, withDeps, wrap, writeScript }:
 
 with builtins;
 rec {
   astsOf =
     with rec {
-      script = wrap {
-        name   = "astsOf";
-        paths  = [ bash jq ];
-        vars   = { inherit (testData.tip-benchmark) asts; };
-        script = ''
-          #!/usr/bin/env bash
-          set -e
+      script = runCommand "astsOf"
+        {
+          buildInputs = [
+            (haskellPackages.ghcWithPackages (h: [
+              h.aeson
+            ]))
+          ];
+          main = writeScript "Main.hs" ''
+            {-# LANGUAGE OverloadedStrings #-}
+            import Control.Monad (mzero)
+            import qualified Data.Aeson                 as Aeson
+            import qualified Data.ByteString.Lazy.Char8 as BS
+            import qualified Data.Map.Lazy              as Map
+            import qualified Data.Text                  as T
+            import qualified System.IO.Unsafe
 
-          # Takes a JSON array of names, returns a JSON array of their ASTs
-          jq --slurpfile asts "$asts" \
-            'sort | map(. as $name | $asts[0] | map(select(.name == $name))) |
-                    add'
+            -- Data types and JSON parsers/printers
+
+            newtype Name = Name { unName :: T.Text } deriving (Eq, Ord)
+
+            instance Aeson.FromJSON Name where
+              parseJSON x = Name <$> Aeson.parseJSON x
+
+            newtype AST = AST  Aeson.Object
+
+            instance Aeson.ToJSON AST where
+              toJSON (AST x) = Aeson.toJSON x
+
+            newtype NamedAST = NAST { unNamed :: (Name, AST) }
+
+            type ASTMap = Map.Map Name AST
+
+            instance Aeson.FromJSON NamedAST where
+              parseJSON (Aeson.Object o) = do n <- o Aeson..: "name"
+                                              pure (NAST (n, AST o))
+              parseJSON _                = mzero
+
+            -- Maps names to their ASTs/metadata, reading from a known file
+            astMap :: ASTMap
+            astMap = Map.fromList (map unNamed asts)
+              where asts :: [NamedAST]
+                    asts = case Aeson.eitherDecode encoded of
+                                Left err -> error err
+                                Right xs -> xs
+                    encoded = System.IO.Unsafe.unsafePerformIO
+                                (BS.readFile "${testData.tip-benchmark.asts}")
+
+            -- Parse, lookup, print
+
+            astsOf = map get
+              where get n        = Map.findWithDefault (err n) n astMap
+                    err (Name n) = error ("No AST for " ++ show n)
+
+            -- Reads JSON array of names from stdin, prints JSON array of ASTs
+            main = BS.interact namesToAsts
+              where namesToAsts :: BS.ByteString -> BS.ByteString
+                    namesToAsts s = case Aeson.eitherDecode s of
+                                         Left err -> error err
+                                         Right ns -> Aeson.encode
+                                                       (astsOf ns)
+          '';
+        }
+        ''
+          cp "$main" Main.hs
+          ghc --make Main.hs -o "$out"
         '';
-      };
 
       test = runCommand "test-astsOf"
         {
