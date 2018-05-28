@@ -1,3 +1,85 @@
-{ nixedHsPkg, nixpkgs1709 }:
+# Command to read annotated ASTs from stdin, and write them to stdout grouped
+# into "buckets". Chooses what to put in each bucket arbitrarily by using a
+# hash of the names.
+{ bash, bc, format, haskellPackages, jq, mkBin, runCommand, withDeps }:
+with rec {
+  hashes = mkBin {
+    name   = "hashBucket";
+    paths  = [ bash bc haskellPackages.ghc jq ];
+    vars   = { SIMPLE = "1"; };
+    script = ''
+      #!/usr/bin/env bash
+      set -e
+      set -o pipefail
 
-nixpkgs1709.haskellPackages.callPackage (nixedHsPkg ../hash-bucket) {}
+      INPUT=$(cat)
+
+      # Wrap up raw objects into an array
+      if echo "$INPUT" | jq -r 'type' | grep 'object' > /dev/null
+      then
+        INPUT=$(echo "$INPUT" | jq -s '.')
+      fi
+
+      if [[ -n "$CLUSTER_SIZE" ]]
+      then
+        echo "Using cluster size of $CLUSTER_SIZE" 1>&2
+        LENGTH=$(echo "$INPUT" | jq 'length')
+        [[ -n "$LENGTH" ]] || LENGTH=0
+
+        PROG=$(echo "main = print (ceiling (($LENGTH :: Float) / $CLUSTER_SIZE) :: Int)")
+        CLUSTERS=$(echo "$PROG" | runhaskell)
+
+        echo "Using $CLUSTERS clusters of length $CLUSTER_SIZE" 1>&2
+      fi
+
+      [[ -n "$CLUSTERS" ]] || {
+        CLUSTERS=$(echo "$INPUT" | jq 'length | sqrt | . + 0.5 | floor')
+        export CLUSTERS
+
+        echo "No cluster count given; using $CLUSTERS (sqrt of sample size)" 1>&2
+      }
+
+      clCount="$CLUSTERS"
+      export clCount
+
+      function getHashes() {
+        echo "Calculating SHA256 checksums of names" 1>&2
+        while read -r ENTRY
+        do
+          NAME=$(echo "$ENTRY" | jq -r '.name')
+
+          SHA=$(echo "clusters-$clCount-name-$NAME-entropy-input-$INPUT" |
+                sha256sum | cut -d ' ' -f1 | tr '[:lower:]' '[:upper:]')
+
+          # Convert hex to decimal. Use large BC_LINE_LENGTH to avoid line-
+          # breaking.
+          SHADEC=$(echo "ibase=16; $SHA" | BC_LINE_LENGTH=5000 bc)
+
+          # Calculate modulo, now that both numbers are in decimal
+          NUM=$(echo "$SHADEC % $CLUSTERS" | BC_LINE_LENGTH=5000 bc)
+
+          # Cluster numbers start from 1
+          echo "$ENTRY" | jq --argjson num "$NUM" '. + {"cluster": ($num + 1)}'
+        done < <(echo "$INPUT" | jq -c '.[]') | jq -s '.'
+      }
+
+      getHashes | "${format.fromStdin}"
+    '';
+  };
+
+  hashCheck = runCommand "hash-bucket-check" { buildInputs = [ hashes jq ]; } ''
+    set -e
+    set -o pipefail
+
+    echo "Testing empty input" 1>&2
+    echo "" | CLUSTER_SIZE=10 hashBucket 1 1 | jq -e 'length | . == 0'
+
+    echo "Testing single input" 1>&2
+    O='{"name":"foo", "type": "T", "quickspecable": true}'
+    echo "[$O]" | CLUSTER_SIZE=10 hashBucket 1 1 |
+      jq -e --argjson o "$O" '. == [[$o + {"cluster":1}]]'
+
+    mkdir "$out"
+  '';
+};
+withDeps [ hashCheck ] hashes
