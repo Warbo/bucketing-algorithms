@@ -10,7 +10,6 @@ samples = load_samples()
 def time_asts(size):
     key = str(size)
     for rep in samples[key]:
-        stderr.write('Running rep {0}\n'.format(str(rep)))
         run_on([cmd], samples[key][rep])
 
 time_asts.param_names = ['size']
