@@ -13,7 +13,6 @@ def time_hashing(size):
     for rep in samples[key]:
         stderr.write('Running rep {0}\n'.format(str(rep)))
         run_on([cmd], samples[key][rep])
-        break
 
 time_hashing.param_names = ['size']
 time_hashing.params      = [sorted([int(s) for s in samples.keys()])]

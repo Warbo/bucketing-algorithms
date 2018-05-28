@@ -12,7 +12,6 @@ def time_asts(size):
     for rep in samples[key]:
         stderr.write('Running rep {0}\n'.format(str(rep)))
         run_on([cmd], samples[key][rep])
-        break
 
 time_asts.param_names = ['size']
 time_asts.params      = [sorted([int(s) for s in samples.keys()])]
