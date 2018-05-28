@@ -15,7 +15,7 @@ def load_samples():
     return samples
 
 def load_command(c):
-    return loads(getenv('commands'))['astsOf']
+    return loads(getenv('commands'))[c]
 
 def run_on(cmd, stdin):
     p = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE)
