@@ -9,7 +9,6 @@ with rec {
         h.aeson h.cryptonite h.memory h.unordered-containers
       ])) ];
       main = writeScript "hashBucket-main.hs" ''
-        {-# LANGUAGE BangPatterns      #-}
         {-# LANGUAGE OverloadedStrings #-}
         import           Control.Applicative        ((<|>))
         import           Control.Monad              (mzero)
@@ -29,9 +28,9 @@ with rec {
         import           System.IO.Unsafe           (unsafePerformIO)
 
         data AST = AST {
-          getName :: !T.Text,
-          getAST  :: !A.Object,
-          keeper  :: !Bool
+          getName :: T.Text,
+          getAST  :: A.Object,
+          keeper  :: Bool
         }
 
         instance A.ToJSON AST where
@@ -75,19 +74,19 @@ with rec {
 
         bucket :: [AST] -> [[AST]]
         bucket = go (Map.fromList [(i - 1, []) | i <- [1..clusters]])
-          where go !acc []     = Map.elems acc
-                go !acc (a:as) = let (c, a') = pickBucket a
+          where go acc []     = Map.elems acc
+                go acc (a:as) = let (c, a') = pickBucket a
                                  in go (addToBucket c a' acc) as
 
         type BucketMap = Map.Map Int [AST]
 
         addToBucket :: Int -> AST -> BucketMap -> BucketMap
-        addToBucket i v !m = Map.alter insert i m
+        addToBucket i v m = Map.alter insert i m
           where insert Nothing   = Just [v]
                 insert (Just vs) = Just (v:vs)
 
         pickBucket :: AST -> (Int, AST)
-        pickBucket x = (cluster, x { getAST = ast' })
+        pickBucket x = (cluster, x { getAST  = ast' })
           where cluster :: Num a => a
                 cluster = fromInteger (num `mod` toInteger clusters)
                 name    = getName x
@@ -98,7 +97,7 @@ with rec {
 
         bsToInteger :: BS.ByteString -> Integer
         bsToInteger = BS.foldl appendByte 0
-          where appendByte !n b = (n * 256) + toInteger b
+          where appendByte n b = (n * 256) + toInteger b
 
         input = unInput (parse (unsafePerformIO BL.getContents))
           where parse s = case A.eitherDecode s of
