@@ -25,7 +25,6 @@ with rec {
         import           Data.Maybe                 (fromJust)
         import qualified Data.Text                  as T
         import qualified Data.Text.Encoding         as TE
-        import qualified Debug.Trace                as Trace
         import           System.Environment         (lookupEnv)
         import           System.IO.Unsafe           (unsafePerformIO)
 
@@ -102,7 +101,7 @@ with rec {
           where appendByte n b = (n * 256) + toInteger b
 
         input = unInput (parse (unsafePerformIO BL.getContents))
-          where parse s = Trace.trace ("Input is:\n" ++ show s) $ case A.eitherDecode s of
+          where parse s = case A.eitherDecode s of
                   Left err -> if BL.all isSpace s
                                  then Input []
                                  else abort ["Failed to parse input", err]
@@ -111,8 +110,7 @@ with rec {
         abort = error . L.intercalate " "
 
         render :: [[AST]] -> BL.ByteString
-        render = (\x -> Trace.trace ("Output is " ++ show x) x) .
-                 go (go (A.encode . getAST) (Just keeper)) Nothing
+        render = go (go (A.encode . getAST) (Just keeper)) Nothing
           where go :: (a -> BL.ByteString)
                    -> Maybe (a -> Bool)
                    -> [a]
