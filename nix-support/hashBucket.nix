@@ -25,18 +25,28 @@ with rec {
         import           System.Environment         (lookupEnv)
         import           System.IO.Unsafe           (unsafePerformIO)
 
-        newtype AST = AST { unAST :: (T.Text, A.Object) }
+        data AST = AST {
+          getName :: T.Text,
+          getAST  :: A.Object,
+          keeper  :: Bool
+        }
 
         instance A.ToJSON AST where
           toJSON = A.Object . getAST
 
-        getName = fst . unAST
-        getAST  = snd . unAST
-
         instance A.FromJSON AST where
-          parseJSON (A.Object o) = do n <- o A..: "name"
-                                      pure (AST (n, o))
-          parseJSON _            = mzero
+          parseJSON (A.Object o) = do
+            n <- o A..:  "name"
+            t <- o A..:? "type"
+            q <- o A..:? "quickspecable"
+            pure (AST {
+              getName = n,
+              getAST  = HM.delete "features" o,
+              keeper  = case (q, t :: Maybe String) of
+                             (Just True, Just _) -> True
+                             _                   -> False
+            })
+          parseJSON _ = mzero
 
         clusters :: Int
         clusters = case ms of
@@ -58,7 +68,7 @@ with rec {
                 insert (Just vs) = Just (v:vs)
 
         pickBucket :: AST -> (Int, AST)
-        pickBucket x = (cluster, AST (name, ast'))
+        pickBucket x = (cluster, x { getAST  = ast' })
           where cluster :: Num a => a
                 cluster = fromInteger (num `mod` toInteger clusters)
                 name    = getName x
@@ -72,12 +82,17 @@ with rec {
           where appendByte n b = (n * 256) + toInteger b
 
         render :: [[AST]] -> BL.ByteString
-        render = (\x -> Trace.trace ("Output is " ++ show x) x) . go (A.encode . getAST) . concat
-          where go :: (a -> BL.ByteString) -> [a] -> BL.ByteString
-                go f = BL.cons '['          .
-                       (`BL.snoc` ']')      .
-                       BL.intercalate ",\n" .
-                       map f
+        render = (\x -> Trace.trace ("Output is " ++ show x) x) .
+                 go (go (A.encode . getAST) (Just keeper)) Nothing
+          where go :: (a -> BL.ByteString)
+                   -> Maybe (a -> Bool)
+                   -> [a]
+                   -> BL.ByteString
+                go f p = BL.cons '['          .
+                         (`BL.snoc` ']')      .
+                         BL.intercalate ",\n" .
+                         map f                .
+                         maybe id filter p
 
         main = BL.interact (render . bucket . parse)
           where parse s = Trace.trace ("Input is:\n" ++ show s) $ case A.eitherDecode s of
@@ -136,7 +151,7 @@ with rec {
       export clCount
 
       echo "Calculating SHA256 checksums of names" 1>&2
-      echo "$INPUT" | "${haskellVersion}" | "${format.fromStdin}"
+      echo "$INPUT" | "${haskellVersion}"
     '';
   };
 
