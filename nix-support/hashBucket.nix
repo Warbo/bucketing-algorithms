@@ -11,6 +11,7 @@ with rec {
       ])) ];
       main = writeScript "hashBucket-main.hs" ''
         {-# LANGUAGE OverloadedStrings #-}
+        import           Control.Applicative        ((<|>))
         import           Control.Monad              (mzero)
         import qualified Crypto.Hash                as H
         import qualified Data.Aeson                 as A
@@ -19,6 +20,7 @@ with rec {
         import qualified Data.ByteString.Lazy.Char8 as BL
         import qualified Data.HashMap.Strict        as HM
         import qualified Data.Map.Strict            as Map
+        import           Data.Maybe                 (fromJust)
         import qualified Data.Text                  as T
         import qualified Data.Text.Encoding         as TE
         import qualified Debug.Trace                as Trace
@@ -49,13 +51,16 @@ with rec {
           parseJSON _ = mzero
 
         clusters :: Int
-        clusters = unsafePerformIO go
-          where go = do e <- fromEnv
-                        case e of
-                          Just s  -> pure (read s)
-                          Nothing -> pure fromIn
-                fromEnv = lookupEnv "CLUSTERS"
-                fromIn  = ceiling (sqrt (fromIntegral (length input)))
+        clusters = fromJust (fromSize <|> fromEnv <|> Just fromIn)
+          where fromSize = case (unsafePerformIO (lookupEnv "CLUSTER_SIZE")) of
+                             Nothing -> Nothing
+                             Just s  -> let size = fromIntegral (read s :: Int)
+                                            len  = fromIntegral inCount :: Float
+                                         in Just (ceil (len / size))
+                fromEnv = fmap read (unsafePerformIO (lookupEnv "CLUSTERS"))
+                fromIn  = ceil (sqrt (fromIntegral inCount))
+                inCount = length input
+                ceil    = ceiling :: Float -> Int
 
         bucket :: [AST] -> [[AST]]
         bucket = go (Map.fromList [(i - 1, []) | i <- [1..clusters]])
@@ -131,19 +136,6 @@ with rec {
       if echo "$INPUT" | jq -r 'type' | grep 'object' > /dev/null
       then
         INPUT=$(echo "$INPUT" | jq -s '.')
-      fi
-
-      if [[ -n "$CLUSTER_SIZE" ]]
-      then
-        echo "Using cluster size of $CLUSTER_SIZE" 1>&2
-        LENGTH=$(echo "$INPUT" | jq 'length')
-        [[ -n "$LENGTH" ]] || LENGTH=0
-
-        PROG=$(echo "main = print (ceiling (($LENGTH :: Float) / $CLUSTER_SIZE) :: Int)")
-        CLUSTERS=$(echo "$PROG" | runhaskell)
-        export CLUSTERS
-
-        echo "Using $CLUSTERS clusters of length $CLUSTER_SIZE" 1>&2
       fi
 
       echo "Calculating SHA256 checksums of names" 1>&2
