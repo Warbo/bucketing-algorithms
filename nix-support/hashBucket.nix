@@ -18,7 +18,9 @@ with rec {
         import           Data.ByteArray             (convert)
         import qualified Data.ByteString            as BS
         import qualified Data.ByteString.Lazy.Char8 as BL
+        import           Data.Char                  (isSpace)
         import qualified Data.HashMap.Strict        as HM
+        import qualified Data.List                  as L
         import qualified Data.Map.Strict            as Map
         import           Data.Maybe                 (fromJust)
         import qualified Data.Text                  as T
@@ -49,6 +51,16 @@ with rec {
                              _                   -> False
             })
           parseJSON _ = mzero
+
+        newtype Input = Input { unInput :: [AST] }
+
+        instance A.FromJSON Input where
+          parseJSON j = case j of
+            A.Object _ -> do ast  <- A.parseJSON j
+                             pure (Input [ast])
+            A.Array  _ -> do asts <- A.parseJSON j
+                             pure (Input asts)
+            _          -> mzero
 
         clusters :: Int
         clusters = fromJust (fromSize <|> fromEnv <|> Just fromIn)
@@ -89,10 +101,14 @@ with rec {
         bsToInteger = BS.foldl appendByte 0
           where appendByte n b = (n * 256) + toInteger b
 
-        input = parse (unsafePerformIO BL.getContents)
+        input = unInput (parse (unsafePerformIO BL.getContents))
           where parse s = Trace.trace ("Input is:\n" ++ show s) $ case A.eitherDecode s of
-                  Left err -> error err
+                  Left err -> if BL.all isSpace s
+                                 then Input []
+                                 else abort ["Failed to parse input", err]
                   Right x  -> x
+
+        abort = error . L.intercalate " "
 
         render :: [[AST]] -> BL.ByteString
         render = (\x -> Trace.trace ("Output is " ++ show x) x) .
@@ -118,28 +134,13 @@ with rec {
   hashes = mkBin {
     name   = "hashBucket";
     paths  = [ bash bc haskellPackages.ghc jq ];
-    vars   = { SIMPLE = "1"; };
     script = ''
       #!/usr/bin/env bash
       set -e
       set -o pipefail
 
-      INPUT=$(cat)
-
-      # Empty input turns into an empty array
-      if [[ -z "$INPUT" ]]
-      then
-        INPUT='[]'
-      fi
-
-      # Wrap up raw objects into an array
-      if echo "$INPUT" | jq -r 'type' | grep 'object' > /dev/null
-      then
-        INPUT=$(echo "$INPUT" | jq -s '.')
-      fi
-
       echo "Calculating SHA256 checksums of names" 1>&2
-      echo "$INPUT" | "${haskellVersion}"
+      "${haskellVersion}"
     '';
   };
 
