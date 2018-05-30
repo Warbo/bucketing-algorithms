@@ -1,10 +1,9 @@
 # Command to read annotated ASTs from stdin, and write them to stdout grouped
 # into "buckets". Chooses what to put in each bucket arbitrarily by using a
 # hash of the names.
-{ bash, bc, fail, format, haskellPackages, jq, mkBin, runCommand, withDeps,
-  writeScript }:
+{ fail, haskellPackages, jq, mkBin, runCommand, withDeps, writeScript }:
 with rec {
-  haskellVersion = runCommand "hashBucket"
+  hashBucket = runCommand "hashBucket"
     {
       buildInputs = [ (haskellPackages.ghcWithPackages (h: [
         h.aeson h.cryptonite h.memory h.unordered-containers
@@ -129,21 +128,13 @@ with rec {
       ghc --make Main.hs -o "$out"
     '';
 
-  hashes = mkBin {
-    name   = "hashBucket";
-    paths  = [ bash bc haskellPackages.ghc jq ];
-    script = ''
-      #!/usr/bin/env bash
-      set -e
-      set -o pipefail
-
-      echo "Calculating SHA256 checksums of names" 1>&2
-      "${haskellVersion}"
-    '';
+  cmd = mkBin {
+    name = "hashBucket";
+    file = hashBucket;
   };
 
   hashCheck = runCommand "hash-bucket-check"
-    { buildInputs = [ fail hashes jq ]; }
+    { buildInputs = [ fail cmd jq ]; }
     ''
       set -e
       set -o pipefail
@@ -173,4 +164,4 @@ with rec {
       mkdir "$out"
     '';
 };
-withDeps [ hashCheck ] hashes
+withDeps [ hashCheck ] cmd
