@@ -49,10 +49,13 @@ with rec {
           parseJSON _ = mzero
 
         clusters :: Int
-        clusters = case ms of
-            Nothing -> error "No clCount given"
-            Just s  -> read s
-          where ms = unsafePerformIO (lookupEnv "clCount")
+        clusters = unsafePerformIO go
+          where go = do e <- fromEnv
+                        case e of
+                          Just s  -> pure (read s)
+                          Nothing -> pure fromIn
+                fromEnv = lookupEnv "CLUSTERS"
+                fromIn  = ceiling (sqrt (fromIntegral (length input)))
 
         bucket :: [AST] -> [[AST]]
         bucket = go (Map.fromList [(i - 1, []) | i <- [1..clusters]])
@@ -81,6 +84,11 @@ with rec {
         bsToInteger = BS.foldl appendByte 0
           where appendByte n b = (n * 256) + toInteger b
 
+        input = parse (unsafePerformIO BL.getContents)
+          where parse s = Trace.trace ("Input is:\n" ++ show s) $ case A.eitherDecode s of
+                  Left err -> error err
+                  Right x  -> x
+
         render :: [[AST]] -> BL.ByteString
         render = (\x -> Trace.trace ("Output is " ++ show x) x) .
                  go (go (A.encode . getAST) (Just keeper)) Nothing
@@ -94,10 +102,7 @@ with rec {
                          map f                .
                          maybe id filter p
 
-        main = BL.interact (render . bucket . parse)
-          where parse s = Trace.trace ("Input is:\n" ++ show s) $ case A.eitherDecode s of
-                  Left err -> error err
-                  Right x  -> x
+        main = BL.putStrLn (render (bucket input))
       '';
     }
     ''
@@ -136,19 +141,10 @@ with rec {
 
         PROG=$(echo "main = print (ceiling (($LENGTH :: Float) / $CLUSTER_SIZE) :: Int)")
         CLUSTERS=$(echo "$PROG" | runhaskell)
+        export CLUSTERS
 
         echo "Using $CLUSTERS clusters of length $CLUSTER_SIZE" 1>&2
       fi
-
-      [[ -n "$CLUSTERS" ]] || {
-        CLUSTERS=$(echo "$INPUT" | jq 'length | sqrt | . + 0.5 | floor')
-        export CLUSTERS
-
-        echo "No cluster count given; using $CLUSTERS (sqrt of sample size)" 1>&2
-      }
-
-      clCount="$CLUSTERS"
-      export clCount
 
       echo "Calculating SHA256 checksums of names" 1>&2
       echo "$INPUT" | "${haskellVersion}"
