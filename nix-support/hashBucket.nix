@@ -121,7 +121,7 @@ with rec {
                          map f                .
                          maybe id filter p
 
-        main = BL.putStrLn (render (bucket input))
+        main = input `seq` clusters `seq` BL.putStrLn (render (bucket input))
       '';
     }
     ''
