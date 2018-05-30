@@ -1,8 +1,95 @@
 # Command to read annotated ASTs from stdin, and write them to stdout grouped
 # into "buckets". Chooses what to put in each bucket arbitrarily by using a
 # hash of the names.
-{ bash, bc, format, haskellPackages, jq, mkBin, runCommand, withDeps }:
+{ bash, bc, fail, format, haskellPackages, jq, mkBin, runCommand, withDeps,
+  writeScript }:
 with rec {
+  haskellVersion = runCommand "hashBucket"
+    {
+      buildInputs = [ (haskellPackages.ghcWithPackages (h: [
+        h.aeson h.cryptonite h.memory h.unordered-containers
+      ])) ];
+      main = writeScript "hashBucket-main.hs" ''
+        {-# LANGUAGE OverloadedStrings #-}
+        import           Control.Monad              (mzero)
+        import qualified Crypto.Hash                as H
+        import qualified Data.Aeson                 as A
+        import           Data.ByteArray             (convert)
+        import qualified Data.ByteString            as BS
+        import qualified Data.ByteString.Lazy.Char8 as BL
+        import qualified Data.HashMap.Strict        as HM
+        import qualified Data.Map.Strict            as Map
+        import qualified Data.Text                  as T
+        import qualified Data.Text.Encoding         as TE
+        import qualified Debug.Trace                as Trace
+        import           System.Environment         (lookupEnv)
+        import           System.IO.Unsafe           (unsafePerformIO)
+
+        newtype AST = AST { unAST :: (T.Text, A.Object) }
+
+        instance A.ToJSON AST where
+          toJSON = A.Object . getAST
+
+        getName = fst . unAST
+        getAST  = snd . unAST
+
+        instance A.FromJSON AST where
+          parseJSON (A.Object o) = do n <- o A..: "name"
+                                      pure (AST (n, o))
+          parseJSON _            = mzero
+
+        clusters :: Int
+        clusters = case ms of
+            Nothing -> error "No clCount given"
+            Just s  -> read s
+          where ms = unsafePerformIO (lookupEnv "clCount")
+
+        bucket :: [AST] -> [[AST]]
+        bucket = go (Map.fromList [(i - 1, []) | i <- [1..clusters]])
+          where go acc []     = Map.elems acc
+                go acc (a:as) = let (c, a') = pickBucket a
+                                 in go (addToBucket c a' acc) as
+
+        type BucketMap = Map.Map Int [AST]
+
+        addToBucket :: Int -> AST -> BucketMap -> BucketMap
+        addToBucket i v m = Map.alter insert i m
+          where insert Nothing   = Just [v]
+                insert (Just vs) = Just (v:vs)
+
+        pickBucket :: AST -> (Int, AST)
+        pickBucket x = (cluster, AST (name, ast'))
+          where cluster :: Num a => a
+                cluster = fromInteger (num `mod` toInteger clusters)
+                name    = getName x
+                ast     = getAST  x
+                ast'    = HM.insert "cluster" (A.Number (1 + cluster)) ast
+                num     = bsToInteger hash
+                hash    = convert (H.hashWith H.SHA256 (TE.encodeUtf8 name))
+
+        bsToInteger :: BS.ByteString -> Integer
+        bsToInteger = BS.foldl appendByte 0
+          where appendByte n b = (n * 256) + toInteger b
+
+        render :: [[AST]] -> BL.ByteString
+        render = (\x -> Trace.trace ("Output is " ++ show x) x) . go (A.encode . getAST) . concat
+          where go :: (a -> BL.ByteString) -> [a] -> BL.ByteString
+                go f = BL.cons '['          .
+                       (`BL.snoc` ']')      .
+                       BL.intercalate ",\n" .
+                       map f
+
+        main = BL.interact (render . bucket . parse)
+          where parse s = Trace.trace ("Input is:\n" ++ show s) $ case A.eitherDecode s of
+                  Left err -> error err
+                  Right x  -> x
+      '';
+    }
+    ''
+      cp "$main" Main.hs
+      ghc --make Main.hs -o "$out"
+    '';
+
   hashes = mkBin {
     name   = "hashBucket";
     paths  = [ bash bc haskellPackages.ghc jq ];
@@ -13,6 +100,12 @@ with rec {
       set -o pipefail
 
       INPUT=$(cat)
+
+      # Empty input turns into an empty array
+      if [[ -z "$INPUT" ]]
+      then
+        INPUT='[]'
+      fi
 
       # Wrap up raw objects into an array
       if echo "$INPUT" | jq -r 'type' | grep 'object' > /dev/null
@@ -42,44 +135,40 @@ with rec {
       clCount="$CLUSTERS"
       export clCount
 
-      function getHashes() {
-        echo "Calculating SHA256 checksums of names" 1>&2
-        while read -r ENTRY
-        do
-          NAME=$(echo "$ENTRY" | jq -r '.name')
-
-          SHA=$(echo "clusters-$clCount-name-$NAME-entropy-input-$INPUT" |
-                sha256sum | cut -d ' ' -f1 | tr '[:lower:]' '[:upper:]')
-
-          # Convert hex to decimal. Use large BC_LINE_LENGTH to avoid line-
-          # breaking.
-          SHADEC=$(echo "ibase=16; $SHA" | BC_LINE_LENGTH=5000 bc)
-
-          # Calculate modulo, now that both numbers are in decimal
-          NUM=$(echo "$SHADEC % $CLUSTERS" | BC_LINE_LENGTH=5000 bc)
-
-          # Cluster numbers start from 1
-          echo "$ENTRY" | jq --argjson num "$NUM" '. + {"cluster": ($num + 1)}'
-        done < <(echo "$INPUT" | jq -c '.[]') | jq -s '.'
-      }
-
-      getHashes | "${format.fromStdin}"
+      echo "Calculating SHA256 checksums of names" 1>&2
+      echo "$INPUT" | "${haskellVersion}" | "${format.fromStdin}"
     '';
   };
 
-  hashCheck = runCommand "hash-bucket-check" { buildInputs = [ hashes jq ]; } ''
-    set -e
-    set -o pipefail
+  hashCheck = runCommand "hash-bucket-check"
+    { buildInputs = [ fail hashes jq ]; }
+    ''
+      set -e
+      set -o pipefail
 
-    echo "Testing empty input" 1>&2
-    echo "" | CLUSTER_SIZE=10 hashBucket 1 1 | jq -e 'length | . == 0'
+      echo "Testing empty input" 1>&2
+      echo "" | CLUSTER_SIZE=10 hashBucket | jq -e 'length | . == 0'
 
-    echo "Testing single input" 1>&2
-    O='{"name":"foo", "type": "T", "quickspecable": true}'
-    echo "[$O]" | CLUSTER_SIZE=10 hashBucket 1 1 |
-      jq -e --argjson o "$O" '. == [[$o + {"cluster":1}]]'
+      echo "Testing single input" 1>&2
+      O='{"name":"foo", "type": "T", "quickspecable": true}'
+      echo "[$O]" | CLUSTER_SIZE=10 hashBucket |
+        jq -e --argjson o "$O" '. == [[$o + {"cluster":1}]]'
 
-    mkdir "$out"
-  '';
+      O=$(echo '[{"name":"foo", "type":"T", "quickspecable":true},
+                 {"name":"bar", "type":"U", "quickspecable":true}]' |
+            CLUSTER_SIZE=1 hashBucket) || fail "Didn't bucket"
+      echo "$O" | jq -e 'type | . == "array"' ||
+        fail "Wrong result type"
+      echo "$O" | jq -e 'length | . == 2' ||
+        fail "Wrong number of buckets"
+      echo "$O" | jq -e 'map(type | . == "array") | all' ||
+        fail "Wrong bucket types"
+      echo "$O" | jq -e 'map(length | . == 1) | all' ||
+        fail "Wrong bucket lengths"
+      echo "$O" | jq -e 'map(.[] | .name) | sort | . == ["bar", "foo"]' ||
+        fail "Wrong names"
+
+      mkdir "$out"
+    '';
 };
 withDeps [ hashCheck ] hashes
