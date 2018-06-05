@@ -1,0 +1,23 @@
+From: Chris Warburton
+Date: Tue, 05 Jun 2018 16:45:16 +0100
+State: new
+Subject: Move benchmarks/env.nix to benchmarks/default.nix
+Message-Id: <d887fb711b190a65-0-artemis@nixos>
+
+Minor change, but would make things a bit nicer. A couple of reasons we
+haven't done this yet:
+
+ - It would alter the sha256 of asv.conf.json, causing a mass
+   re-benchmark. That's not too bad on its own.
+ - We're pushing benchmark pages with `copy_benchmarks`, which assumes
+   there's only a single benchmark cache for each project (as defined by
+   the asv.conf.json project name).
+
+We should probably handle this better in `copy_benchmarks` before making
+this change. For example, if we made `copy_benchmarks` loop through all
+of the caches *first*, accumulating a string of project names, we could
+add a simple check to spot if a project has multiple caches, and we can
+skip that project with a warning message telling us what the caches are.
+
+That would alert us to the problem, which we could fix manually (by
+deleting the older one).

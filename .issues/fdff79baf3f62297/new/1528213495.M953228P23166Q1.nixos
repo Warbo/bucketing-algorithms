@@ -1,0 +1,8 @@
+From: Chris Warburton
+Date: Tue, 05 Jun 2018 16:44:46 +0100
+Subject: Re: Add HashSpec asv benchmark for Isabelle theories
+Message-Id: <fdff79baf3f62297-bffb7b0480a5442d-artemis@nixos>
+References: <fdff79baf3f62297-0-artemis@nixos>
+In-Reply-To: <fdff79baf3f62297-0-artemis@nixos>
+
+We only bucket.

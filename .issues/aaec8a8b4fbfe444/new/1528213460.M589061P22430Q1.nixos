@@ -1,0 +1,8 @@
+From: Chris Warburton
+Date: Tue, 05 Jun 2018 16:44:03 +0100
+Subject: Re: Add MLSpec asv benchmark for Isabelle theories
+Message-Id: <aaec8a8b4fbfe444-d9ee4daf2bd8b9ab-artemis@nixos>
+References: <aaec8a8b4fbfe444-0-artemis@nixos>
+In-Reply-To: <aaec8a8b4fbfe444-0-artemis@nixos>
+
+We only bucket; running on Isabelle theories is out of scope
