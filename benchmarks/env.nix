@@ -1,8 +1,8 @@
 # Builds the environment in which to run a benchmark. This will be called from
 # asv, passing in dependencies as arguments.
 {
-  dir,  # Path to the revision containing the benchmarks
-  root, # Path to the revision being benchmarked
+  dir  ? ./.., # Path to the revision containing the benchmarks
+  root ? ./.., # Path to the revision being benchmarked
   ...
 }:
 
