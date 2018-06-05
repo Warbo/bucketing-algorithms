@@ -7,9 +7,6 @@ with {
     # Implementation details
     pkgs = import ./nix-support args;
 
-    # Used for general performance testing, as well as formal evaluation
-    benchmarkRunner = import ./shell.nix;
-
     # Provides our exploration scripts
     inherit (pkgs) package;
   };

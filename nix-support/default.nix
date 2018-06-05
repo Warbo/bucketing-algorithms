@@ -48,9 +48,6 @@ fix (self: rec {
 
   # Cases where we want both the attribute set and its attributes available
 
-  inherit (dumpToNixScripts)
-    dumpToNix;
-
   inherit (haskellTE)
     testData;
 
@@ -62,6 +59,7 @@ fix (self: rec {
   callPackage = nixpkgs.callPackage ./callPackage.nix { inherit self; };
 
   benchmarkingCommands  = callPackage ./benchmarkingCommands.nix  {};
+  bucketProportions     = callPackage ./bucketProportions.nix     {};
   buckets               = callPackage ./buckets.nix               {};
   callHackage           = callPackage ./callHackage.nix           {};
   checkHsEnv            = callPackage ./checkHsEnv.nix            {};
