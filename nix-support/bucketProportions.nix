@@ -2,27 +2,13 @@
 # proportion of ground truth theorems which apply to the resulting buckets.
 #
 # Write output to JSON for archiving.
-{
-  # Parameters for the results
-  maxSize ? 100, reps ? 100,
-
-  # General dependencies, supplied by callPackage
-  benchmarkingCommands,
-  buckets,
-  jq,
-  lib,
-  makeSamples,
-  nixpkgs,
-  runCommand,
-  tebenchmark,
-  testData,
-  wrap
-}:
+{ benchmarkingCommands, buckets, jq, lib, makeSamples, nixpkgs, runCommand,
+  tebenchmark, testData, wrap }:
 with { inherit (builtins) concatStringsSep map; };
-rec  {
-  inherit maxSize reps;
 
-  samples = makeSamples { inherit maxSize reps; };
+{ samplingParams ? { maxSize = 100; reps = 100; } }: rec {
+
+  samples = makeSamples samplingParams;
 
   # Runs each sample through the stdio of a given program, adding the result to
   # the samples JSON. Useful for running a bucketing script on each sample.
@@ -81,7 +67,7 @@ rec  {
   addHashBuckets = samples: processSamples {
     inherit samples;
     key  = "hashed";
-    prog = commands.addHashBucketsCmd;
+    prog = benchmarkingCommands.addHashBucketsCmd;
   };
 
   groundTruthsOf = samples: runCommand "ground-truths.json"
@@ -173,5 +159,5 @@ rec  {
 
   withBuckets = addHashBuckets samples;
 
-  result = groundTruthsOf withBuckets;
+  hashTruths = groundTruthsOf withBuckets;
 }
