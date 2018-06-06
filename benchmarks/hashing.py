@@ -7,8 +7,8 @@ samples = load_samples()
 def time_hashing(size):
     key = str(size)
     # We deterministically choose a single rep for now, to avoid timing out
-    rep = min(samples[key].keys())
-    run_on([cmd], samples[key][rep])
+    for rep in samples[key]:
+        run_on([cmd], samples[key][rep])
 
 time_hashing.param_names = ['size']
 time_hashing.params      = [sorted([int(s) for s in samples.keys()])]
