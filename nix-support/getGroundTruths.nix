@@ -88,9 +88,39 @@ with rec {
       samples     = makeSamples { sizes = [ 1 5 10 ]; reps = 3; };
     }
     ''
-      O=$("$go" < "$samples") || fail "Failed to add ground truths"
-      echo "$O" | jq -e 'type | . == "object"' || fail "Didn't get object\n$O"
-      echo "$O" > "$out"
+      O=$(echo 'nope' | "$go" 2>&1) && fail "Non-JSON should error\n$O"
+
+      O=$(echo '{}'   | "$go") || fail "JSON object should work\n$O"
+      [[ "x$O" = "x{}" ]]      || fail "Object should give '{}', got '$O'"
+
+      O=$(echo '[]'   | "$go" 2>&1) && fail "JSON array should fail\n$O"
+      O=$(echo 'null' | "$go" 2>&1) && fail "JSON null should fail\n$O"
+
+      O=$(echo '{"x":[]}' | "$go") || fail "Non-empty object failed\n$O"
+      WANT='{"x":{"names":[],"theorems":[]}}'
+      echo "$O" | jq -e --argjson want "$WANT" '. == $want' ||
+        fail "Non-empty object should produce '$WANT', got '$O'"
+      unset WANT
+
+      O=$(echo '{"x":["global64"]}' | "$go") || fail "Non-empty array failed"
+      echo "$O" | jq -e '.x | type | . == "object"' ||
+        fail "Non-empty array's 'x' should be object, got '$O'"
+      echo "$O" | jq -e '.x | has("names")' ||
+        fail "Non-empty array's 'x' should have 'names', got '$O'"
+      echo "$O" | jq -e '.x | has("theorems")' ||
+        fail "Non-empty array's 'x' should have 'theorems', got '$O'"
+      echo "$O" | jq -e '.x | .names | . == ["global64"]' ||
+        fail "Non-empty 'names' should match input '[\"global64\"]', got '$O'"
+      echo "$O" | jq -e '.x | .theorems | . == []' ||
+        fail "Bogus names should get empty 'theorems', got '$O'"
+
+      O=$("$go" < "$samples") || fail "Didn't get ground truths of samples"
+      echo "$O" | jq -e 'map(map(.sample | .theorems
+                                         | length
+                                         | . > 0) | all) | all' ||
+        fail "Every sample should have at least one theorem '$O'"
+
+      mkdir "$out"
     '';
 };
 withDeps [ test ] go
