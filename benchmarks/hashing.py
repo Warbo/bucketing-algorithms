@@ -1,9 +1,5 @@
-from json       import dumps, loads
-from os         import getenv
-from subprocess import PIPE, Popen
-from sys        import stderr
-from timeit     import default_timer
-from .util      import load_command, load_samples, run_on
+from timeit import default_timer
+from .util  import load_command, load_samples, run_on
 
 cmd     = load_command('addHashBucketsCmd')
 samples = load_samples()
