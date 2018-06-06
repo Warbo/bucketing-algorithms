@@ -6,7 +6,6 @@ samples = load_samples()
 
 def time_hashing(size):
     key = str(size)
-    # We deterministically choose a single rep for now, to avoid timing out
     for rep in samples[key]:
         run_on([cmd], samples[key][rep])
 

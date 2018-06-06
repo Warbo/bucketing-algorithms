@@ -20,7 +20,7 @@ fixed.mkBin {
     # All of the scripts to benchmark should be in here, taken from measured
     commands = toJSON {
       inherit (measured.benchmarkingCommands)
-        addHashBucketsCmd astsOf dedupeSamples;
+        addHashBucketsCmd astsOf dedupeSamples getGroundTruths;
     };
 
     # A fixed set of samples, for scripts which need them as input
