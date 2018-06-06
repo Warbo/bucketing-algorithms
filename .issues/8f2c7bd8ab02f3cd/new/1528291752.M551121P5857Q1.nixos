@@ -1,0 +1,16 @@
+From: Chris Warburton
+Date: Wed, 06 Jun 2018 14:24:55 +0100
+State: new
+Subject: Speed up getGroundTruths
+Message-Id: <8f2c7bd8ab02f3cd-0-artemis@nixos>
+
+It's really slow, taking several seconds per run. That's unacceptable if
+we want to get the ground truths before and after bucketing for
+thousands of samples.
+
+It's currently written in Racket, since the required data and functions
+are provided by tebenchmark. The obvious thing to do would be:
+
+ 1) Port it to Haskell, since it has lower overhead and faster startup.
+ 2) Switch to fast-lookup datastructures, even if they're slow to build
+ 3) Move file reading and datastructure building to compile time with TH
