@@ -88,4 +88,4 @@ given: with rec {
 
   hashProportions = throw "hashProportions not implemented";
 };
-{ inherit hashTruths withBuckets; }
+{ inherit fullTruths hashTruths withBuckets; }
