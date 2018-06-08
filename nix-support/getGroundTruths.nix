@@ -18,6 +18,7 @@ with rec {
         import qualified Data.ByteString.Char8      as B
         import qualified Data.ByteString.Lazy       as LB
         import qualified Data.Char                  as C
+        import qualified Data.List                  as List
         import qualified Data.Maybe                 as M
         import qualified Data.Text                  as T
         import qualified Numeric                    as N
@@ -86,10 +87,29 @@ with rec {
                               [(n, "")] -> C.chr n
                               _         -> error (show ("Invalid hex", a, b))
 
-        main = LB.interact (A.encode . theoremFilesAdmittedBy . parse)
-          where parse s = case A.eitherDecode s of
-                            Left  e -> error e
-                            Right x -> map decodeName x
+        nub :: (Eq a, Ord a) => [a] -> [a]
+        nub = go [] . List.sort
+          where go acc l  = case l of
+                              []       ->   acc
+                              [x]      -> x:acc
+                              (x:y:zs) -> if x == y
+                                             then go    acc  (y:zs)
+                                             else go (x:acc) (y:zs)
+
+        main = LB.interact (A.encode . go)
+          where go s = case A.eitherDecode s of
+                         Right x -> process x
+                         Left e1 -> case A.eitherDecode s of
+                                      Left  e2 -> err e1 e2
+                                      Right xs -> nested xs
+
+                err e1 e2 = error ("No parse: " ++ e1 ++ "\n\n" ++ e2)
+
+                process :: [Name] -> [TheoremID]
+                process = theoremFilesAdmittedBy . map decodeName
+
+                nested :: [[Name]] -> [TheoremID]
+                nested = nub . concatMap process
       '';
     }
     ''
@@ -120,20 +140,10 @@ with rec {
         (error (format "~S" x)))
 
       ;; Ground truth for a sample (list of encoded names)
-      (define (theorems-of-sample sample)
+      (define (theorems-of-sample sample-or-list)
         (string->jsexpr
-          (run-pipeline/out `(echo ,(jsexpr->string sample))
+          (run-pipeline/out `(echo ,(jsexpr->string sample-or-list))
                             '(haskellVersion))))
-
-      ;; Ground truth for a list of samples (e.g. buckets)
-      (define (theorems-of-sample-list samples)
-        (eprintf "theorems-of-sample-list\n")
-        (remove-duplicates
-          (foldl (lambda (sample theorems)
-                   (eprintf "\n~S\n" `((theorems ,theorems) (sample ,sample)))
-                   (append theorems (theorems-of-sample sample)))
-                 '()
-                samples)))
 
       ;; Takes a sample or list of samples, returns it with ground truth
       (define (add-ground-truth sample-or-list)
@@ -147,15 +157,8 @@ with rec {
 
                            [(empty? sample-or-list) '()]
 
-                           [(string? (first sample-or-list))
-                            (theorems-of-sample      sample-or-list)]
-
-                           [(list?   (first sample-or-list))
-                            (theorems-of-sample-list sample-or-list)]
-
-                           [#t (err
-                             `((error "Unexpected list type")
-                               (sample-or-list ,sample-or-list)))])))))
+                           [#t
+                            (theorems-of-sample sample-or-list)])))))
 
       ;; Adds ground truths to any lists in the given map, recursively
       (define (add-ground-truths data)
