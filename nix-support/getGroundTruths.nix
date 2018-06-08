@@ -150,15 +150,7 @@ with rec {
         (eprintf "add-ground-truth\n")
         (make-immutable-hash
           `((names    . ,sample-or-list)
-            (theorems . ,(cond
-                           [(not (list? sample-or-list))
-                            (err `((error "Should have got a list")
-                                   (sample-or-list ,sample-or-list)))]
-
-                           [(empty? sample-or-list) '()]
-
-                           [#t
-                            (theorems-of-sample sample-or-list)])))))
+            (theorems . ,(theorems-of-sample sample-or-list)))))
 
       ;; Adds ground truths to any lists in the given map, recursively
       (define (add-ground-truths data)
