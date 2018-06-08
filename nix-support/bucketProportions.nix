@@ -21,10 +21,7 @@ given: with rec {
       script = wrap {
         name  = "process-samples.py";
         paths = [ nixpkgs.python3 ];
-        vars  = {
-          inherit key prog;
-          inherit (testData.tip-benchmark) asts;
-        };
+        vars  = { inherit key prog; };
         script = ''
           #!/usr/bin/env python3
           from io         import StringIO
@@ -37,7 +34,7 @@ given: with rec {
 
           sort = lambda collection: sorted([elem for elem in collection])
 
-          prog = getenv('prog')
+          key, prog = map(getenv, ['key', 'prog'])
 
           process = lambda names: loads(check_output(
             [prog],
@@ -48,7 +45,7 @@ given: with rec {
               return None
             if type(val) == type({}):
               if 'sample' in val:
-                return dict(val, sample=recurse(path, val['sample']))
+                return dict(val, **{key: recurse(path, val['sample'])})
               return {k: recurse(path + [k], val[k]) for k in sort(val)}
             msg(path)
             return process(val)
