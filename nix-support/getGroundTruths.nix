@@ -119,18 +119,11 @@ with rec {
       (define (err x)
         (error (format "~S" x)))
 
-      (define (theorems-of encoded-names)
-        (string->jsexpr
-          (run-pipeline/out `(echo ,(jsexpr->string encoded-names))
-                            '(haskellVersion))))
-
       ;; Ground truth for a sample (list of encoded names)
       (define (theorems-of-sample sample)
-        (eprintf "theorems-of-sample\n")
-        (unless (list? sample)
-          (err `((error  "Expected sample to be a list")
-                 (sample ,sample))))
-        (theorems-of sample))
+        (string->jsexpr
+          (run-pipeline/out `(echo ,(jsexpr->string sample))
+                            '(haskellVersion))))
 
       ;; Ground truth for a list of samples (e.g. buckets)
       (define (theorems-of-sample-list samples)
