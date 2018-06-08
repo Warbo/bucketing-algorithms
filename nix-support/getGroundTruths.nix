@@ -18,6 +18,7 @@ with rec {
         import qualified Data.ByteString.Char8      as B
         import qualified Data.ByteString.Lazy       as LB
         import qualified Data.Char                  as C
+        import qualified Data.HashMap.Strict        as H
         import qualified Data.List                  as List
         import qualified Data.Maybe                 as M
         import qualified Data.Text                  as T
@@ -120,14 +121,28 @@ with rec {
                 nested []  = []
                 nested nns = nub (concatMap process nns)
 
-        main = LB.interact (A.encode . mkResult . go)
-          where go s = case A.eitherDecode s of
-                         Right x -> Left x
-                         Left e1 -> case A.eitherDecode s of
-                                      Right xs -> Right xs
-                                      Left  e2 -> err e1 e2
+        addTruths :: A.Value -> Result
+        addTruths x = mkResult ns
+          where ns = case A.fromJSON x of
+                       A.Success y -> Left y
+                       A.Error  e1 -> case A.fromJSON x of
+                                        A.Success ys -> Right ys
+                                        A.Error   e2 -> err e1 e2
+                err e1 e2 = error (show ("Couldn't decode", x, e1, e2))
 
-                err e1 e2 = error ("No parse: " ++ e1 ++ "\n\n" ++ e2)
+        augmentObject :: A.Object -> A.Object
+        augmentObject = H.map go
+          where go v = case v of
+                         A.Array  a -> A.toJSON (addTruths v)
+                         A.Object o -> A.Object (augmentObject o)
+                         A.Null     -> A.Null
+                         _          -> error (show ("Unexpected entry", v))
+
+        main = LB.interact (A.encode . go)
+          where go s = case A.eitherDecode s of
+                         Left  e            -> error e
+                         Right (A.Object o) -> A.Object (augmentObject o)
+                         Right x            -> error (show ("Bad parse", x))
       '';
     }
     ''
@@ -137,51 +152,9 @@ with rec {
     '';
 
   go = wrap {
-    name   = "get-ground-truths.rkt";
-    paths  = [
-      tebenchmark.env
-      (mkBin { name = "haskellVersion"; file = haskellVersion; })
-    ];
-    vars   = tebenchmark.cache // { inherit haskellVersion; };
-    script = ''
-      #!/usr/bin/env racket
-      #lang racket
-      (require json)
-      (require shell/pipeline)
-      (require lib/conjectures)
-      (require lib/normalise)
-      (require lib/util)
-
-      (define (err x)
-        (error (format "~S" x)))
-
-      ;; Takes a sample or list of samples, returns it with ground truth
-      (define (add-ground-truth sample-or-list)
-        (eprintf "add-ground-truth\n")
-        (string->jsexpr
-          (run-pipeline/out `(echo ,(jsexpr->string sample-or-list))
-                                   '(haskellVersion))))
-
-      ;; Adds ground truths to any lists in the given map, recursively
-      (define (add-ground-truths data)
-        (eprintf "add-ground-truths\n")
-        (hash-foldl (lambda (key value result)
-                      (hash-set result key
-                        (cond
-                          [(list?  value) (add-ground-truth  value)]
-                          [(hash?  value) (add-ground-truths value)]
-                          [(equal? value 'null) value]
-
-                          [#t (err `((error  "Unexpected type")
-                                     (key    ,key)
-                                     (value  ,value)
-                                     (result ,result)))])))
-                    (make-immutable-hash '())
-                    data))
-
-      ;; Add ground truths to stdio
-      (write-json (add-ground-truths (string->jsexpr (port->string))))
-    '';
+    name = "get-ground-truths.rkt";
+    vars = tebenchmark.cache;
+    file = haskellVersion;
   };
 
   test = runCommand "test-get-ground-truths"
