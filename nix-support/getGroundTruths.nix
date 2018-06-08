@@ -7,9 +7,9 @@ with rec {
       buildInputs = [ (haskellPackages.ghcWithPackages (h: [
         h.aeson h.atto-lisp h.attoparsec h.bytestring h.text
       ])) ];
-      main = writeScript "get-ground-truths-main.hs" ''
+      helper = writeScript "get-ground-truths-helper.hs" ''
         {-# LANGUAGE OverloadedStrings #-}
-        module Main where
+        module Helper where
 
         import           Control.Monad              (mzero)
         import qualified Data.Aeson                 as A
@@ -55,28 +55,6 @@ with rec {
                            pure (TDs (map toPair tds))
             where toPair [Left id, Right deps] = (id, deps)
 
-        theoremFilesAdmittedBy :: [Name] -> [TheoremID]
-        theoremFilesAdmittedBy sample = map fst (filter match theoremDeps)
-          where match td = snd td `subset` sample
-
-        theoremDeps :: [(TheoremID, [Name])]
-        theoremDeps = unsafePerformIO go
-          where go = do
-                  mp <- Env.lookupEnv name
-                  case mp of
-                    Nothing -> error ("Environment doesn't contain " ++ name)
-                    Just p  -> strToData <$> B.readFile p
-
-                name = "BENCHMARKS_THEOREM_DEPS"
-
-                lispToData l = case L.parseEither L.parseLisp l of
-                                 Left  e -> error e
-                                 Right d -> d
-
-                strToData  s = case AP.parseOnly (L.lisp <* AP.endOfInput) s of
-                                 Left  e -> error e
-                                 Right l -> lispToData l
-
         subset []     ys = True
         subset (x:xs) ys = (x `elem` ys) && (xs `subset` ys)
 
@@ -110,6 +88,49 @@ with rec {
               "names"    A..= either A.toJSON A.toJSON (names r)
             , "theorems" A..= A.toJSON (theorems r)
             ]
+      '';
+
+      main = writeScript "get-ground-truths-main.hs" ''
+        {-# LANGUAGE OverloadedStrings #-}
+        module Main where
+
+        import           Helper
+        import           Control.Monad              (mzero)
+        import qualified Data.Aeson                 as A
+        import qualified Data.AttoLisp              as L
+        import qualified Data.Attoparsec.ByteString as AP
+        import qualified Data.ByteString.Char8      as B
+        import qualified Data.ByteString.Lazy       as LB
+        import qualified Data.Char                  as C
+        import qualified Data.HashMap.Strict        as H
+        import qualified Data.List                  as List
+        import qualified Data.Maybe                 as M
+        import qualified Data.Text                  as T
+        import qualified Numeric                    as N
+        import qualified System.Environment         as Env
+        import           System.IO.Unsafe           (unsafePerformIO)
+
+        theoremDeps :: [(TheoremID, [Name])]
+        theoremDeps = unsafePerformIO go
+          where go = do
+                  mp <- Env.lookupEnv name
+                  case mp of
+                    Nothing -> error ("Environment doesn't contain " ++ name)
+                    Just p  -> strToData <$> B.readFile p
+
+                name = "BENCHMARKS_THEOREM_DEPS"
+
+                lispToData l = case L.parseEither L.parseLisp l of
+                                 Left  e -> error e
+                                 Right d -> d
+
+                strToData  s = case AP.parseOnly (L.lisp <* AP.endOfInput) s of
+                                 Left  e -> error e
+                                 Right l -> lispToData l
+
+        theoremFilesAdmittedBy :: [Name] -> [TheoremID]
+        theoremFilesAdmittedBy sample = map fst (filter match theoremDeps)
+          where match td = snd td `subset` sample
 
         mkResult :: Either [Name] [[Name]] -> Result
         mkResult ns = R { names = ns, theorems = either process nested ns }
@@ -146,7 +167,8 @@ with rec {
       '';
     }
     ''
-      cp "$main" Main.hs
+      cp "$helper" Helper.hs
+      cp "$main"   Main.hs
       ghc --make -o Main Main.hs
       mv Main "$out"
     '';
