@@ -37,15 +37,11 @@ given: with rec {
 
           sort = lambda collection: sorted([elem for elem in collection])
 
-          asts = {x['name']: x for x in loads(open(getenv('asts'), 'r').read())}
-
-          astsFor = lambda names: [asts[name] for name in sort(names)]
-
           prog = getenv('prog')
 
           process = lambda names: loads(check_output(
             [prog],
-            input=dumps(astsFor(names)).encode('utf-8')).decode('utf-8'))
+            input=dumps(names).encode('utf-8')).decode('utf-8'))
 
           def recurse(path, val):
             if val is None:

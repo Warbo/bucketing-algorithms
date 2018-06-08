@@ -1,0 +1,43 @@
+From: Chris Warburton
+Date: Fri, 08 Jun 2018 15:26:57 +0100
+State: resolved
+Subject: Bucketing a collection of samples fails
+Message-Id: <a7b1f3580e420874-0-artemis@nixos>
+resolution: fixed
+
+From Hydra:
+
+    <5>building path(s) ‘/nix/store/1jpbm93rxi0rd30g5r6qzp0vw0kl8bz7-processed-hashed.json’
+    b9f5a5jjla2s5ws0n6j0ic64pflcyzk6-astsOf: when expecting a Lazy Text, encountered Object instead
+    ['1', '0']
+    Traceback (most recent call last):
+      File "/nix/store/vxbhq89jbpv9szm21piwbf3srpdndikr-process-samples.py", line 34, in <module>
+        print(dumps(recurse([], data)))
+      File "/nix/store/vxbhq89jbpv9szm21piwbf3srpdndikr-process-samples.py", line 28, in recurse
+        return {k: recurse(path + [k], val[k]) for k in sort(val)}
+      File "/nix/store/vxbhq89jbpv9szm21piwbf3srpdndikr-process-samples.py", line 28, in <dictcomp>
+        return {k: recurse(path + [k], val[k]) for k in sort(val)}
+      File "/nix/store/vxbhq89jbpv9szm21piwbf3srpdndikr-process-samples.py", line 28, in recurse
+        return {k: recurse(path + [k], val[k]) for k in sort(val)}
+      File "/nix/store/vxbhq89jbpv9szm21piwbf3srpdndikr-process-samples.py", line 28, in <dictcomp>
+        return {k: recurse(path + [k], val[k]) for k in sort(val)}
+      File "/nix/store/vxbhq89jbpv9szm21piwbf3srpdndikr-process-samples.py", line 27, in recurse
+        return dict(val, sample=recurse(path, val['sample']))
+      File "/nix/store/vxbhq89jbpv9szm21piwbf3srpdndikr-process-samples.py", line 30, in recurse
+        return process(val)
+      File "/nix/store/vxbhq89jbpv9szm21piwbf3srpdndikr-process-samples.py", line 20, in <lambda>
+        input=dumps(astsFor(names)).encode('utf-8')).decode('utf-8'))
+      File "/nix/store/klzk8v5mfipfcs2f5004riqmnycsfz8p-python3-3.4.4/lib/python3.4/subprocess.py", line 620, in check_output
+        raise CalledProcessError(retcode, process.args, output=output)
+    subprocess.CalledProcessError: Command '['/nix/store/9rj1jpgnf8nxj3bgpj06kwngp95013vq-hash']' returned non-zero exit status 1
+    <3>builder for ‘/nix/store/r1gm3hbrpfyna994pi0wzfcp3x1y1fbc-processed-hashed.json.drv’ failed with exit code 1
+
+It looks to me like the Python runner is fetching ASTs of each sample,
+and passing those into the bucketing command.
+
+That doesn't fit with how our bucketing currently works: the bucketing
+commands read in a list of names, and they look up those names using the
+'astsOf' Haskell command from benchmarkingCommands.
+
+I'll try removing this AST-lookup step from the Python, so the bucketers
+can do it themselves.

@@ -1,0 +1,10 @@
+From: Chris Warburton
+Date: Fri, 08 Jun 2018 16:15:48 +0100
+Subject: Re: Bucketing a collection of samples fails
+Message-Id: <a7b1f3580e420874-c94b3946d36d842e-artemis@nixos>
+References: <a7b1f3580e420874-0-artemis@nixos>
+In-Reply-To: <a7b1f3580e420874-0-artemis@nixos>
+
+This was indeed caused by passing in ASTs instead of names (i.e. the AST
+lookup functionality has been moved into astsOf, which the (wrappers
+around the) bucketing scripts call themselves).
