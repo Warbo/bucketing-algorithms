@@ -106,10 +106,12 @@ with rec {
                 err e1 e2 = error ("No parse: " ++ e1 ++ "\n\n" ++ e2)
 
                 process :: [Name] -> [TheoremID]
-                process = theoremFilesAdmittedBy . map decodeName
+                process [] = []
+                process ns = theoremFilesAdmittedBy (map decodeName ns)
 
                 nested :: [[Name]] -> [TheoremID]
-                nested = nub . concatMap process
+                nested []  = []
+                nested nns = nub (concatMap process nns)
       '';
     }
     ''
