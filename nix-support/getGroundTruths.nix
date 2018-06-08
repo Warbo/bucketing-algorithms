@@ -99,31 +99,35 @@ with rec {
                                              then go    acc  (y:zs)
                                              else go (x:acc) (y:zs)
 
-        main = LB.interact (A.encode . go)
-          where go s = case A.eitherDecode s of
-                         Right x -> process x
-                         Left e1 -> case A.eitherDecode s of
-                                      Left  e2 -> err e1 e2
-                                      Right xs -> nested xs
         data Result = R {
             names    :: Either [Name] [[Name]]
           , theorems :: [TheoremID]
           }
 
-                err e1 e2 = error ("No parse: " ++ e1 ++ "\n\n" ++ e2)
         instance A.ToJSON Result where
           toJSON r = A.object [
               "names"    A..= either A.toJSON A.toJSON (names r)
             , "theorems" A..= A.toJSON (theorems r)
             ]
 
-                process :: [Name] -> [TheoremID]
+        mkResult :: Either [Name] [[Name]] -> Result
+        mkResult ns = R { names = ns, theorems = either process nested ns }
+          where process :: [Name] -> [TheoremID]
                 process [] = []
                 process ns = theoremFilesAdmittedBy (map decodeName ns)
 
                 nested :: [[Name]] -> [TheoremID]
                 nested []  = []
                 nested nns = nub (concatMap process nns)
+
+        main = LB.interact (A.encode . mkResult . go)
+          where go s = case A.eitherDecode s of
+                         Right x -> Left x
+                         Left e1 -> case A.eitherDecode s of
+                                      Right xs -> Right xs
+                                      Left  e2 -> err e1 e2
+
+                err e1 e2 = error ("No parse: " ++ e1 ++ "\n\n" ++ e2)
       '';
     }
     ''
@@ -151,18 +155,12 @@ with rec {
       (define (err x)
         (error (format "~S" x)))
 
-      ;; Ground truth for a sample (list of encoded names)
-      (define (theorems-of-sample sample-or-list)
-        (string->jsexpr
-          (run-pipeline/out `(echo ,(jsexpr->string sample-or-list))
-                            '(haskellVersion))))
-
       ;; Takes a sample or list of samples, returns it with ground truth
       (define (add-ground-truth sample-or-list)
         (eprintf "add-ground-truth\n")
-        (make-immutable-hash
-          `((names    . ,sample-or-list)
-            (theorems . ,(theorems-of-sample sample-or-list)))))
+        (string->jsexpr
+          (run-pipeline/out `(echo ,(jsexpr->string sample-or-list))
+                                   '(haskellVersion))))
 
       ;; Adds ground truths to any lists in the given map, recursively
       (define (add-ground-truths data)
