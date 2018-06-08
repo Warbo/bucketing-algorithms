@@ -128,13 +128,11 @@ with rec {
     script = ''
       #!/usr/bin/env racket
       #lang racket
-      (require        json)
-      (require        rackunit)
-      (require        shell/pipeline)
-      (require        lib/conjectures)
-      (require/expose lib/conjectures (theorem-files-admitted-by))
-      (require        lib/normalise)
-      (require        lib/util)
+      (require json)
+      (require shell/pipeline)
+      (require lib/conjectures)
+      (require lib/normalise)
+      (require lib/util)
 
       (define (err x)
         (error (format "~S" x)))
