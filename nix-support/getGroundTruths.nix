@@ -3,12 +3,12 @@
 
 with rec {
   haskellVersion = runCommand "get-ground-truths-haskell"
-    {
+    (tebenchmark.cache // {
       buildInputs = [ (haskellPackages.ghcWithPackages (h: [
         h.aeson h.atto-lisp h.attoparsec h.bytestring h.text
       ])) ];
       helper = writeScript "get-ground-truths-helper.hs" ''
-        {-# LANGUAGE OverloadedStrings #-}
+        {-# LANGUAGE OverloadedStrings, TemplateHaskell #-}
         module Helper where
 
         import           Control.Monad              (mzero)
@@ -22,6 +22,7 @@ with rec {
         import qualified Data.List                  as List
         import qualified Data.Maybe                 as M
         import qualified Data.Text                  as T
+        import           Language.Haskell.TH.Syntax (Exp(..), Lift, lift)
         import qualified Numeric                    as N
         import qualified System.Environment         as Env
         import           System.IO.Unsafe           (unsafePerformIO)
@@ -29,6 +30,10 @@ with rec {
         type TheoremID = String
 
         newtype Name = N T.Text deriving (Eq, Show)
+
+        instance Lift Name where
+          lift (N n) = do arg <- lift (T.unpack n)
+                          pure (AppE (ConE 'N) (AppE (VarE 'T.pack) arg))
 
         instance A.FromJSON Name where
           parseJSON s = N <$> A.parseJSON s
@@ -91,7 +96,7 @@ with rec {
       '';
 
       main = writeScript "get-ground-truths-main.hs" ''
-        {-# LANGUAGE OverloadedStrings #-}
+        {-# LANGUAGE OverloadedStrings, TemplateHaskell #-}
         module Main where
 
         import           Helper
@@ -106,27 +111,29 @@ with rec {
         import qualified Data.List                  as List
         import qualified Data.Maybe                 as M
         import qualified Data.Text                  as T
+        import           Language.Haskell.TH.Syntax (lift, runIO)
         import qualified Numeric                    as N
         import qualified System.Environment         as Env
         import           System.IO.Unsafe           (unsafePerformIO)
 
         theoremDeps :: [(TheoremID, [Name])]
-        theoremDeps = unsafePerformIO go
-          where go = do
-                  mp <- Env.lookupEnv name
-                  case mp of
-                    Nothing -> error ("Environment doesn't contain " ++ name)
-                    Just p  -> strToData <$> B.readFile p
-
-                name = "BENCHMARKS_THEOREM_DEPS"
+        theoremDeps =
+          $(let name = "BENCHMARKS_THEOREM_DEPS"
 
                 lispToData l = case L.parseEither L.parseLisp l of
                                  Left  e -> error e
                                  Right d -> d
 
+                strToData :: B.ByteString -> [(TheoremID, [Name])]
                 strToData  s = case AP.parseOnly (L.lisp <* AP.endOfInput) s of
                                  Left  e -> error e
                                  Right l -> lispToData l
+
+             in do mp <- runIO (Env.lookupEnv name)
+                   s  <- case mp of
+                           Nothing -> error ("Env doesn't contain " ++ name)
+                           Just p  -> runIO (B.readFile p)
+                   lift (strToData s))
 
         theoremFilesAdmittedBy :: [Name] -> [TheoremID]
         theoremFilesAdmittedBy sample = map fst (filter match theoremDeps)
@@ -165,7 +172,7 @@ with rec {
                          Right (A.Object o) -> A.Object (augmentObject o)
                          Right x            -> error (show ("Bad parse", x))
       '';
-    }
+    })
     ''
       cp "$helper" Helper.hs
       cp "$main"   Main.hs
@@ -175,7 +182,6 @@ with rec {
 
   go = wrap {
     name = "get-ground-truths.rkt";
-    vars = tebenchmark.cache;
     file = haskellVersion;
   };
 
