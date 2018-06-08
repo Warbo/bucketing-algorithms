@@ -32,17 +32,18 @@ with rec {
         instance A.FromJSON Name where
           parseJSON s = N <$> A.parseJSON s
 
-        -- Our cached data uses symbols, which may be escaped if they
-        -- contain e.g. "'". Escaped symbols are wrapped in pipes "|".
-        unescapeSym s = case T.stripPrefix "|" s of
-                          Nothing -> s
-                          Just s2 -> case T.stripSuffix "|" s2 of
-                            Nothing  -> s
-                            Just s3 -> s3
 
         instance L.FromLisp Name where
-          parseLisp (L.Symbol n) = pure (N (unescapeSym n))
-          parseLisp _            = mzero
+          parseLisp l = case l of
+                          L.Symbol n -> pure (N (unescapeSym n))
+                          _          -> mzero
+            -- Our cached data uses symbols, which may be escaped if they
+            -- contain e.g. "'". Escaped symbols are wrapped in pipes "|".
+            where unescapeSym s = case T.stripPrefix "|" s of
+                                    Nothing -> s
+                                    Just s2 -> case T.stripSuffix "|" s2 of
+                                                 Nothing  -> s
+                                                 Just s3 -> s3
 
         newtype TheoremDeps = TDs [(TheoremID, [Name])]
 
