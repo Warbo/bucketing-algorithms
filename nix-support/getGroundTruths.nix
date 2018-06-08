@@ -32,6 +32,8 @@ with rec {
         instance A.FromJSON Name where
           parseJSON s = N <$> A.parseJSON s
 
+        instance A.ToJSON Name where
+          toJSON (N n) = A.toJSON n
 
         instance L.FromLisp Name where
           parseLisp l = case l of
@@ -103,8 +105,17 @@ with rec {
                          Left e1 -> case A.eitherDecode s of
                                       Left  e2 -> err e1 e2
                                       Right xs -> nested xs
+        data Result = R {
+            names    :: Either [Name] [[Name]]
+          , theorems :: [TheoremID]
+          }
 
                 err e1 e2 = error ("No parse: " ++ e1 ++ "\n\n" ++ e2)
+        instance A.ToJSON Result where
+          toJSON r = A.object [
+              "names"    A..= either A.toJSON A.toJSON (names r)
+            , "theorems" A..= A.toJSON (theorems r)
+            ]
 
                 process :: [Name] -> [TheoremID]
                 process [] = []
