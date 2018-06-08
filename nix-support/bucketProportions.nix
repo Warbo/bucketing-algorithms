@@ -45,10 +45,12 @@ given: with rec {
               return None
             if type(val) == type({}):
               if 'sample' in val:
-                return dict(val, **{key: recurse(path, val['sample'])})
+                return dict(val, **{key: recurse(path + ['sample'],
+                                                 val['sample'])})
               return {k: recurse(path + [k], val[k]) for k in sort(val)}
-            msg(path)
-            return process(val)
+            if path != [] and path[-1] == 'sample':
+              return process(val)
+            return val
 
           data = loads(stdin.read())
 
