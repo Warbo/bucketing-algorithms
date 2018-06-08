@@ -17,7 +17,10 @@ with rec {
         import qualified Data.Attoparsec.ByteString as AP
         import qualified Data.ByteString.Char8      as B
         import qualified Data.ByteString.Lazy       as LB
+        import qualified Data.Char                  as C
+        import qualified Data.Maybe                 as M
         import qualified Data.Text                  as T
+        import qualified Numeric                    as N
         import qualified System.Environment         as Env
         import           System.IO.Unsafe           (unsafePerformIO)
 
@@ -72,10 +75,21 @@ with rec {
         subset []     ys = True
         subset (x:xs) ys = (x `elem` ys) && (xs `subset` ys)
 
+        decodeName (N n) = case M.catMaybes [T.stripPrefix "global" n,
+                                             T.stripPrefix "Global" n] of
+                             []   -> error ("Bad name " ++ show n)
+                             n2:_ -> N (T.pack (decodeASCII "" (T.unpack n2)))
+          where decodeASCII acc s = case s of
+                                      []     -> reverse acc
+                                      a:b:cs -> decodeASCII (unHex a b:acc) cs
+                unHex a b = case N.readHex [a, b] of
+                              [(n, "")] -> C.chr n
+                              _         -> error (show ("Invalid hex", a, b))
+
         main = LB.interact (A.encode . theoremFilesAdmittedBy . parse)
           where parse s = case A.eitherDecode s of
                             Left  e -> error e
-                            Right x -> x
+                            Right x -> map decodeName x
       '';
     }
     ''
@@ -105,9 +119,9 @@ with rec {
       (define (err x)
         (error (format "~S" x)))
 
-      (define (theorems-of decoded-names)
+      (define (theorems-of encoded-names)
         (string->jsexpr
-          (run-pipeline/out `(echo ,(jsexpr->string decoded-names))
+          (run-pipeline/out `(echo ,(jsexpr->string encoded-names))
                             '(haskellVersion))))
 
       ;; Ground truth for a sample (list of encoded names)
@@ -116,8 +130,7 @@ with rec {
         (unless (list? sample)
           (err `((error  "Expected sample to be a list")
                  (sample ,sample))))
-        (theorems-of (map (compose symbol->string decode-name string->symbol)
-                          sample)))
+        (theorems-of sample))
 
       ;; Ground truth for a list of samples (e.g. buckets)
       (define (theorems-of-sample-list samples)
