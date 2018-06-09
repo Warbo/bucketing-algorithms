@@ -1,8 +1,9 @@
 From: Chris Warburton
 Date: Wed, 06 Jun 2018 14:24:55 +0100
-State: new
+State: resolved
 Subject: Speed up getGroundTruths
 Message-Id: <8f2c7bd8ab02f3cd-0-artemis@nixos>
+resolution: fixed
 
 It's really slow, taking several seconds per run. That's unacceptable if
 we want to get the ground truths before and after bucketing for

@@ -1,0 +1,55 @@
+From: Chris Warburton
+Date: Sat, 09 Jun 2018 16:53:10 +0100
+Subject: Re: Speed up getGroundTruths
+Message-Id: <8f2c7bd8ab02f3cd-811c50281fe7b319-artemis@nixos>
+References: <8f2c7bd8ab02f3cd-0-artemis@nixos>
+In-Reply-To: <8f2c7bd8ab02f3cd-0-artemis@nixos>
+
+I've ported this to Haskell now (after adding a bunch more tests to
+check that it's behaving properly) and it's now only taking about 30
+milliseconds. This is probably fast enough, even without any algorithmic
+improvements. Hence I'm closing this issue.
+
+I did take the opportunity to read in the data at compile time using
+Template Haskell, since that eliminates some runtime failure conditions
+(e.g. if the data's not found, if it fails to parse, etc.)
+
+For the record, here are the algorithmic improvements we could make, if
+this turned out to be needed (since I did spend some time thinking about
+it):
+
+Our big-O behaviour comes from looking up theorems whose dependencies
+are a subset of our sample. We're doing this with linear scans: we
+always check every theorem (unless our sample's empty); let's say that
+there are T theorems. For each one, we loop through all of its
+dependencies, let's say there are D dependencies on average. For each
+dependency we loop through our sample to see if there are any matches;
+let's call our sample size S.
+
+This means we're performing O(T * D * S) comparisons. In our case T is a
+few hundred, D is quite small (say less than 10) and S depends on the
+input, which we vary between 1 to 100.
+
+We could use lexicographic ordering to speed up some of these. In
+particular, if we represent sets as ordered lists then we can make the
+subset check linear, i.e. O(max(D, S)), turning our overall time into
+O(T * max(D, S)), which is roughly quadratic rather than cubic.
+
+We can bring down the comparison time even more if we represent the sets
+as bitmaps: if the theorem dependencies contain N distinct names, we can
+represent each set with an N-bit word (names which appear in the input
+but not the theorem deps are irrelevant to the lookup). Each bit
+represents the presence or absence of a particular name. We have around
+180 names, which could span 3 64bit machine words, or 6 32bit machine
+words. Testing membership would only require a small, constant number of
+operations, e.g. something like 'dep & sample == dep'. The bitset
+Haskell package will do this for us; it uses Integer (bignum) to avoid
+being limited to a single machine word.
+
+As for the lookup itself, there are datastructure which could help, such
+as tries. These can be optimised to take into account the fact that sets
+don't *require* an order (unlike e.g. strings, which tries are commonly
+used for), but can *utilise* an ordering to speed up their
+implementation. In particular we can short-circuit when we know that
+some element cannot possibly appear, since (due to the ordering) we
+would have already seen it.
