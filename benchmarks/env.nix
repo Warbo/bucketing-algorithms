@@ -17,6 +17,8 @@ fixed.mkBin {
   name  = "python";
   paths = [ (fixed.nixpkgs1609.python3.withPackages (p: [])) ];
   vars  = {
+    inherit root;
+
     # All of the scripts to benchmark should be in here, taken from measured
     commands = toJSON {
       inherit (measured.benchmarkingCommands)
