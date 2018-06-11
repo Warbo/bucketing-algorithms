@@ -2,8 +2,8 @@
 # proportion of ground truth theorems which apply to the resulting buckets.
 #
 # Write output to JSON for archiving.
-{ benchmarkingCommands, buckets, jq, lib, makeSamples, nixpkgs, runCommand,
-  tebenchmark, testData, wrap }:
+{ benchmarkingCommands, jq, lib, makeSamples, nixpkgs, runCommand, tebenchmark,
+  testData, wrap }:
 with { inherit (builtins) concatStringsSep map; };
 
 given: with rec {

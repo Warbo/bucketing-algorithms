@@ -5,8 +5,7 @@
   stdenv, withDeps, wrap, writeScript }:
 
 with rec {
-
-  recurrent = mkBin {
+  go = mkBin {
     name   = "recurrentBucket";
     paths  = [ bash jq runWeka ];
     vars   = { SIMPLE = "1"; };
@@ -26,7 +25,4 @@ with rec {
   };
 };
 
-{
-  inherit recurrent;
-  hashes = callPackage ./hashBucket.nix {};
-}
+withDeps [] go

@@ -60,7 +60,6 @@ fix (self: rec {
 
   benchmarkingCommands  = callPackage ./benchmarkingCommands.nix  {};
   bucketProportions     = callPackage ./bucketProportions.nix     {};
-  buckets               = callPackage ./buckets.nix               {};
   callHackage           = callPackage ./callHackage.nix           {};
   checkHsEnv            = callPackage ./checkHsEnv.nix            {};
   checkStderr           = callPackage ./checkStderr.nix           {};
@@ -84,6 +83,7 @@ fix (self: rec {
   nixedHsPkg            = callPackage ./nixedHsPkg.nix            {};
   package               = callPackage ./package.nix               {};
   pkgName               = callPackage ./pkgName.nix               {};
+  recurrentBucket       = callPackage ./recurrentBucket.nix       {};
   runWeka               = callPackage ./runWeka.nix               {};
   tebenchmark           = callPackage ./tebenchmark.nix           {};
   tryTip                = callPackage ./tryTip.nix                {};
