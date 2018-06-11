@@ -38,6 +38,27 @@ rec {
     '';
   };
 
+  addRecurrentBucketsCmd = wrap {
+    name  = "recurrent";
+    paths = [ recurrentBucket jq ];
+    vars  = {
+      inherit astsOf;
+      sizes = concatStringsSep " " (map toString (lib.range 1 20));
+    };
+    script = ''
+      #!/usr/bin/env bash
+      set -e
+      ASTS=$("$astsOf")
+
+      for CLUSTER_SIZE in $sizes
+      do
+        export CLUSTER_SIZE
+        echo "$ASTS" | recurrentBucket |
+          jq '{(env["CLUSTER_SIZE"]) : map(map(.name))}'
+      done | jq -s 'add'
+    '';
+  };
+
   makeDupeSamples = callPackage ./makeDupeSamples.nix {};
 
   dedupeSamples = wrap {
