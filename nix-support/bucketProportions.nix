@@ -68,6 +68,12 @@ given: with rec {
     prog = benchmarkingCommands.addHashBucketsCmd;
   };
 
+  addRecurrentBuckets = samples: processSamples {
+    inherit samples;
+    key  = "recurrent";
+    prog = benchmarkingCommands.addRecurrentBucketsCmd;
+  };
+
   groundTruthsOf = samples: runCommand "ground-truths.json"
     {
       inherit samples;
@@ -75,12 +81,8 @@ given: with rec {
     }
     ''"$getGroundTruths" < "$samples" > "$out"'';
 
-  withBuckets = addHashBuckets samples;
+  addAllBuckets = samples: addHashBuckets (addRecurrentBuckets samples);
 
-  hashTruths = groundTruthsOf withBuckets;
-
-  fullTruths = groundTruthsOf samples;
-
-  hashProportions = throw "hashProportions not implemented";
+  proportionsOf = throw "proportionsOf not implemented";
 };
-{ inherit fullTruths hashTruths withBuckets; }
+proportionsOf (groundTruthsOf (addAllBuckets samples))
