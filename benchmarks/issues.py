@@ -13,9 +13,9 @@ def track_issues():
         for d in contents(issues, i):
             # One message will be the "root" with metadata stored in its headers
             for msg in contents(issues, i, d):
-                content = ''
+                content = u''
                 with open(join(issues, i, d, msg), 'r') as f:
-                    content = f.read()
+                    content = f.read().decode('utf-8')
                 for line in content.split('\n'):
                     if line.startswith('resolution:') and 'fixed' in line:
                         fixed = True
