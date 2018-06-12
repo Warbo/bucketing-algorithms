@@ -1,14 +1,46 @@
 # Commands which split their input into various "buckets", e.g. based on
 # clustering. We don't do any exploration or reduction, we just look at the
 # resulting buckets.
-{ bash, bc, bucketCheck, cluster, format, jq, mkBin, ghc, runCommand, runWeka,
-  stdenv, withDeps, wrap, writeScript }:
+{ bash, bc, bucketCheck, cluster, format, haskellPackages, jq, mkBin,
+  runCommand, runWeka, stdenv, withDeps, wrap, writeScript }:
 
 with rec {
+  compile = { main, name }: runCommand "recurrent-bucket-${name}"
+    {
+      buildInputs = [
+        (haskellPackages.ghcWithPackages (hs: [
+        ]))
+      ];
+      main = writeScript "recurrent-bucket-${name}.hs" main;
+    }
+    ''
+      cp "$main" Main.hs
+      ghc --make -o Main Main.hs
+      mv Main "$out"
+    '';
+
+  haskellPre = compile {
+    name = "pre";
+    main = ''
+      module Main where
+      import qualified Data.ByteString.Lazy.Char8 as LBS
+      main = LBS.interact id
+    '';
+  };
+
+  haskellPost = compile {
+    name = "post";
+    main = ''
+      module Main where
+      import qualified Data.ByteString.Lazy.Char8 as LBS
+      main = LBS.interact id
+    '';
+  };
+
   cmd = mkBin {
     name   = "recurrentBucket";
     paths  = [ bash jq runWeka ];
-    vars   = { SIMPLE = "1"; };
+    vars   = { inherit haskellPre haskellPost; SIMPLE = "1"; };
     script = ''
       #!/usr/bin/env bash
       set -e
@@ -30,7 +62,7 @@ with rec {
         INPUT='['"$INPUT"']'
       fi
 
-      CLUSTERED=$(echo "$INPUT" | ${cluster})
+      CLUSTERED=$(echo "$INPUT" | "$haskellPre" | "${cluster}" | "$haskellPost")
 
       clCount=$(echo "$CLUSTERED" | jq 'map(.cluster) | max')
       export clCount
