@@ -59,6 +59,7 @@ fix (self: rec {
   callPackage = nixpkgs.callPackage ./callPackage.nix { inherit self; };
 
   benchmarkingCommands  = callPackage ./benchmarkingCommands.nix  {};
+  bucketCheck           = callPackage ./bucketCheck.nix {};
   bucketProportions     = callPackage ./bucketProportions.nix     {};
   callHackage           = callPackage ./callHackage.nix           {};
   checkHsEnv            = callPackage ./checkHsEnv.nix            {};

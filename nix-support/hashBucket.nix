@@ -1,7 +1,8 @@
 # Command to read annotated ASTs from stdin, and write them to stdout grouped
 # into "buckets". Chooses what to put in each bucket arbitrarily by using a
 # hash of the names.
-{ fail, haskellPackages, jq, mkBin, runCommand, withDeps, writeScript }:
+{ bucketCheck, fail, haskellPackages, jq, mkBin, runCommand, withDeps,
+  writeScript }:
 with rec {
   hashBucket = runCommand "hashBucket"
     {
@@ -133,35 +134,10 @@ with rec {
     file = hashBucket;
   };
 
-  hashCheck = runCommand "hash-bucket-check"
-    { buildInputs = [ fail cmd jq ]; }
-    ''
-      set -e
-      set -o pipefail
-
-      echo "Testing empty input" 1>&2
-      echo "" | CLUSTER_SIZE=10 hashBucket | jq -e 'length | . == 0'
-
-      echo "Testing single input" 1>&2
-      O='{"name":"foo", "type": "T", "quickspecable": true}'
-      echo "[$O]" | CLUSTER_SIZE=10 hashBucket |
-        jq -e --argjson o "$O" '. == [[$o + {"cluster":1}]]'
-
-      O=$(echo '[{"name":"foo", "type":"T", "quickspecable":true},
-                 {"name":"bar", "type":"U", "quickspecable":true}]' |
-            CLUSTER_SIZE=1 hashBucket) || fail "Didn't bucket"
-      echo "$O" | jq -e 'type | . == "array"' ||
-        fail "Wrong result type"
-      echo "$O" | jq -e 'length | . == 2' ||
-        fail "Wrong number of buckets"
-      echo "$O" | jq -e 'map(type | . == "array") | all' ||
-        fail "Wrong bucket types"
-      echo "$O" | jq -e 'map(length | . == 1) | all' ||
-        fail "Wrong bucket lengths"
-      echo "$O" | jq -e 'map(.[] | .name) | sort | . == ["bar", "foo"]' ||
-        fail "Wrong names"
-
-      mkdir "$out"
-    '';
+  hashCheck = bucketCheck {
+    inherit cmd;
+    name = "hash";
+    go   = "hashBucket";
+  };
 };
 withDeps [ hashCheck ] cmd
