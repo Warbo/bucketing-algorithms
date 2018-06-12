@@ -6,8 +6,9 @@ samples = load_samples()
 
 def time_recurrent(size):
     key = str(size)
-    for rep in samples[key]:
-        run_on([cmd], samples[key][rep])
+    rep = sorted(samples[key].keys())[0]
+    #for rep in samples[key]:
+    run_on([cmd], samples[key][rep])
 
 time_recurrent.param_names = ['size']
 time_recurrent.params      = [sorted([int(s) for s in samples.keys()])]
