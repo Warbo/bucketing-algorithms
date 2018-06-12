@@ -83,6 +83,6 @@ given: with rec {
 
   addAllBuckets = samples: addHashBuckets (addRecurrentBuckets samples);
 
-  proportionsOf = throw "proportionsOf not implemented";
+  proportionsOf = builtins.trace "proportionsOf not implemented" (x: x);
 };
 proportionsOf (groundTruthsOf (addAllBuckets samples))
