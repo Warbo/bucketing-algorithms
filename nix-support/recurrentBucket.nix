@@ -9,15 +9,22 @@ with rec {
     {
       buildInputs = [
         (haskellPackages.ghcWithPackages (hs: [
+          hs.aeson
           hs.process
           hs.process-extras
+          hs.unordered-containers
+          hs.vector
         ]))
       ];
       main = writeScript "recurrent-bucket-main.hs" ''
         {-# LANGUAGE OverloadedStrings #-}
         module Main where
+        import qualified Data.Aeson                 as A
         import qualified Data.ByteString.Char8      as BS
+        import qualified Data.ByteString.Lazy.Char8 as LBS
         import qualified Data.Char                  as C
+        import qualified Data.HashMap.Strict        as H
+        import qualified Data.Vector                as V
         import           System.Exit
         import           System.IO
         import qualified System.Process             as P
@@ -27,9 +34,22 @@ with rec {
             (c, o, e) <- PB.readCreateProcessWithExitCode cmd s
             BS.hPutStr stderr e
             case c of
-                 ExitSuccess   -> BS.putStr o
+                 ExitSuccess   -> LBS.putStr (processAsts o)
                  ExitFailure n -> error ("Non-zero exit code " ++ show n)
           where cmd = P.proc "${cluster}" []
+
+        bsToAsts :: BS.ByteString -> A.Value
+        bsToAsts s = case A.eitherDecode (LBS.fromStrict s) of
+                       Left  e -> error ("Failed to read ASTs " ++ e)
+                       Right x -> x
+
+        processAsts = A.encode . goArr . bsToAsts
+          where goArr v = case v of
+                            A.Array a -> A.Array (V.map goObj a)
+                            _         -> error ("Expected array got " ++ show v)
+                goObj v = case v of
+                            A.Object o -> A.Object (H.delete "tocluster" o)
+                            _          -> error ("Expected obj got " ++ show v)
 
         main = do i <- BS.getContents
                   if BS.all C.isSpace i
@@ -68,8 +88,7 @@ with rec {
       clCount=$(echo "$CLUSTERED" | jq 'map(.cluster) | max')
       export clCount
 
-      echo "$CLUSTERED" | jq 'map(del(.tocluster))' |
-                          "${format.fromStdin}"
+      echo "$CLUSTERED" | "${format.fromStdin}"
     '';
   };
 
