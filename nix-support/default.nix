@@ -64,10 +64,8 @@ fix (self: rec {
   callHackage           = callPackage ./callHackage.nix           {};
   checkHsEnv            = callPackage ./checkHsEnv.nix            {};
   checkStderr           = callPackage ./checkStderr.nix           {};
-  cluster               = callPackage ./cluster.nix               {};
   extraHaskellPackages  = callPackage ./extraHaskellPackages.nix  {};
   filterToSampled       = callPackage ./filterToSampled.nix       {};
-  format                = callPackage ./format.nix                {};
   getDepsScript         = callPackage ./getDepsScript.nix         {};
   hashBucket            = callPackage ./hashBucket.nix            {};
   haskellPackages       = callPackage ./haskellPackages.nix       {};
