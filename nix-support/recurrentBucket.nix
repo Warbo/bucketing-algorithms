@@ -1,7 +1,7 @@
 # Commands which split their input into various "buckets", e.g. based on
 # clustering. We don't do any exploration or reduction, we just look at the
 # resulting buckets.
-{ bash, bc, bucketCheck, cluster, format, haskellPackages, jq, mkBin,
+{ bash, bc, bucketCheck, haskellPackages, jq, mkBin,
   runCommand, runWeka, stdenv, withDeps, wrap, writeScript }:
 
 with rec {
@@ -20,11 +20,13 @@ with rec {
       main = writeScript "recurrent-bucket-main.hs" ''
         {-# LANGUAGE OverloadedStrings #-}
         module Main where
+        import           Control.Applicative        ((<|>))
         import qualified Data.Aeson                 as A
         import qualified Data.ByteString.Char8      as BS
         import qualified Data.ByteString.Lazy.Char8 as LBS
         import qualified Data.Char                  as C
         import qualified Data.HashMap.Strict        as H
+        import           Data.Maybe                 (fromJust)
         import qualified Data.Vector                as V
         import           ML4HSFE.Loop
         import           ML4HSFE.Outer
@@ -37,6 +39,7 @@ with rec {
         cluster s Nothing      height        = cluster s (Just "30") height
         cluster s width        Nothing       = cluster s width       (Just "30")
         cluster s (Just width) (Just height) = do
+          () <- setClusters s
           asts <- clusterLoop (handleString (read width)
                                             (read height)
                                             (LBS.fromStrict s))
@@ -62,6 +65,26 @@ with rec {
                                                  (H.delete "tocluster"
                                                    (H.delete "features" o))]
                                                h
+
+        setClusters :: BS.ByteString -> IO ()
+        setClusters s = do
+          c  <- lookupEnv "CLUSTERS"
+          cs <- lookupEnv "CLUSTER_SIZE"
+          setEnv "CLUSTERS" (show (clusters s c cs))
+
+        clusters :: BS.ByteString -> Maybe String -> Maybe String -> Int
+        clusters s c cs = fromJust (fromSize <|> fromEnv <|> Just fromIn)
+          where fromSize = case cs of
+                             Nothing -> Nothing
+                             Just s  -> let size = fromIntegral (read s :: Int)
+                                            len  = fromIntegral inCount :: Float
+                                         in Just (ceil (len / size))
+                fromEnv = fmap read c
+                fromIn  = ceil (sqrt (fromIntegral inCount))
+                inCount = case bsToAsts s of
+                            A.Array a -> V.length a
+                            _         -> error "Expected array"
+                ceil    = ceiling :: Float -> Int
 
         main = do i <- BS.getContents
                   if BS.all C.isSpace i
