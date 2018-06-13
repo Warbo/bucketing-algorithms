@@ -43,13 +43,25 @@ with rec {
                        Left  e -> error ("Failed to read ASTs " ++ e)
                        Right x -> x
 
-        processAsts = A.encode . goArr . bsToAsts
-          where goArr v = case v of
-                            A.Array a -> A.Array (V.map goObj a)
-                            _         -> error ("Expected array got " ++ show v)
-                goObj v = case v of
-                            A.Object o -> A.Object (H.delete "tocluster" o)
+        processAsts = A.encode . H.elems . splitUp . bsToAsts
+          where splitUp v = case v of
+                              A.Array a -> V.foldl' acc H.empty a
+                              _         -> error ("Expected arr got " ++ show v)
+
+                acc h v = case v of
+                            A.Object o -> ins h o
                             _          -> error ("Expected obj got " ++ show v)
+
+                ins h o = let A.Number n = o H.! "cluster"
+                           in case (o H.! "quickspecable", o H.! "type") of
+                                (_,           A.Null) -> h
+                                (A.Bool True, _     ) ->
+                                  H.insertWith (++)
+                                               n
+                                               [A.Object
+                                                 (H.delete "tocluster"
+                                                   (H.delete "features" o))]
+                                               h
 
         main = do i <- BS.getContents
                   if BS.all C.isSpace i
@@ -83,12 +95,7 @@ with rec {
         INPUT='['"$INPUT"']'
       fi
 
-      CLUSTERED=$(echo "$INPUT" | "$haskellVersion")
-
-      clCount=$(echo "$CLUSTERED" | jq 'map(.cluster) | max')
-      export clCount
-
-      echo "$CLUSTERED" | "${format.fromStdin}"
+      echo "$INPUT" | "$haskellVersion"
     '';
   };
 
