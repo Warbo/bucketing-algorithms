@@ -10,6 +10,7 @@ with rec {
       buildInputs = [
         (haskellPackages.ghcWithPackages (hs: [
           hs.aeson
+          hs.ML4HSFE
           hs.process
           hs.process-extras
           hs.unordered-containers
@@ -25,30 +26,29 @@ with rec {
         import qualified Data.Char                  as C
         import qualified Data.HashMap.Strict        as H
         import qualified Data.Vector                as V
+        import           ML4HSFE.Loop
+        import           ML4HSFE.Outer
+        import           System.Environment
         import           System.Exit
         import           System.IO
         import qualified System.Process             as P
         import qualified System.Process.ByteString  as PB
 
-        cluster s = do
-            (c, o, e) <- PB.readCreateProcessWithExitCode cmd s
-            BS.hPutStr stderr e
-            case c of
-                 ExitSuccess   -> LBS.putStr (processAsts o)
-                 ExitFailure n -> error ("Non-zero exit code " ++ show n)
-          where cmd = P.proc "${cluster}" []
+        cluster s Nothing      height        = cluster s (Just "30") height
+        cluster s width        Nothing       = cluster s width       (Just "30")
+        cluster s (Just width) (Just height) = do
+          asts <- clusterLoop (handleString (read width)
+                                            (read height)
+                                            (LBS.fromStrict s))
+          LBS.putStr (processAsts asts)
 
         bsToAsts :: BS.ByteString -> A.Value
         bsToAsts s = case A.eitherDecode (LBS.fromStrict s) of
                        Left  e -> error ("Failed to read ASTs " ++ e)
                        Right x -> x
 
-        processAsts = A.encode . H.elems . splitUp . bsToAsts
-          where splitUp v = case v of
-                              A.Array a -> V.foldl' acc H.empty a
-                              _         -> error ("Expected arr got " ++ show v)
-
-                acc h v = case v of
+        processAsts = A.encode . H.elems . V.foldl' acc H.empty
+          where acc h v = case v of
                             A.Object o -> ins h o
                             _          -> error ("Expected obj got " ++ show v)
 
@@ -66,7 +66,9 @@ with rec {
         main = do i <- BS.getContents
                   if BS.all C.isSpace i
                      then BS.putStr "[]"
-                     else cluster i
+                     else do width  <- lookupEnv "WIDTH"
+                             height <- lookupEnv "HEIGHT"
+                             cluster i width height
       '';
     }
     ''
