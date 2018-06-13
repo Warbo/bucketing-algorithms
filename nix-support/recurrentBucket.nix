@@ -5,13 +5,37 @@
   runCommand, runWeka, stdenv, withDeps, wrap, writeScript }:
 
 with rec {
-  compile = { main, name }: runCommand "recurrent-bucket-${name}"
+  haskellVersion = runCommand "recurrent-bucket"
     {
       buildInputs = [
         (haskellPackages.ghcWithPackages (hs: [
+          hs.process
+          hs.process-extras
         ]))
       ];
-      main = writeScript "recurrent-bucket-${name}.hs" main;
+      main = writeScript "recurrent-bucket-main.hs" ''
+        {-# LANGUAGE OverloadedStrings #-}
+        module Main where
+        import qualified Data.ByteString.Char8      as BS
+        import qualified Data.Char                  as C
+        import           System.Exit
+        import           System.IO
+        import qualified System.Process             as P
+        import qualified System.Process.ByteString  as PB
+
+        cluster s = do
+            (c, o, e) <- PB.readCreateProcessWithExitCode cmd s
+            BS.hPutStr stderr e
+            case c of
+                 ExitSuccess   -> BS.putStr o
+                 ExitFailure n -> error ("Non-zero exit code " ++ show n)
+          where cmd = P.proc "${cluster}" []
+
+        main = do i <- BS.getContents
+                  if BS.all C.isSpace i
+                     then BS.putStr "[]"
+                     else cluster i
+      '';
     }
     ''
       cp "$main" Main.hs
@@ -19,28 +43,10 @@ with rec {
       mv Main "$out"
     '';
 
-  haskellPre = compile {
-    name = "pre";
-    main = ''
-      module Main where
-      import qualified Data.ByteString.Lazy.Char8 as LBS
-      main = LBS.interact id
-    '';
-  };
-
-  haskellPost = compile {
-    name = "post";
-    main = ''
-      module Main where
-      import qualified Data.ByteString.Lazy.Char8 as LBS
-      main = LBS.interact id
-    '';
-  };
-
   cmd = mkBin {
     name   = "recurrentBucket";
     paths  = [ bash jq runWeka ];
-    vars   = { inherit haskellPre haskellPost; SIMPLE = "1"; };
+    vars   = { inherit haskellVersion; SIMPLE = "1"; };
     script = ''
       #!/usr/bin/env bash
       set -e
@@ -48,11 +54,6 @@ with rec {
 
       # Allow empty input (as in ", not just "[]") for compatibility
       INPUT=$(cat)
-      [[ -n "$INPUT" ]] || {
-        echo "Empty input, nothing to cluster, short-circuiting" 1>&2
-        echo '[]'
-        exit 0
-      }
 
       # Allow a single input (as in "{...}", not "[{...}]") for compatibility
       CHAR=$(echo "$INPUT" | head -n1 | cut -c 1)
@@ -62,7 +63,7 @@ with rec {
         INPUT='['"$INPUT"']'
       fi
 
-      CLUSTERED=$(echo "$INPUT" | "$haskellPre" | "${cluster}" | "$haskellPost")
+      CLUSTERED=$(echo "$INPUT" | "$haskellVersion")
 
       clCount=$(echo "$CLUSTERED" | jq 'map(.cluster) | max')
       export clCount
