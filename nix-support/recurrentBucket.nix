@@ -76,27 +76,9 @@ with rec {
     '';
 
   cmd = mkBin {
-    name   = "recurrentBucket";
-    paths  = [ bash jq runWeka ];
-    vars   = { inherit haskellVersion; SIMPLE = "1"; };
-    script = ''
-      #!/usr/bin/env bash
-      set -e
-      set -o pipefail
-
-      # Allow empty input (as in ", not just "[]") for compatibility
-      INPUT=$(cat)
-
-      # Allow a single input (as in "{...}", not "[{...}]") for compatibility
-      CHAR=$(echo "$INPUT" | head -n1 | cut -c 1)
-      if [[ "x$CHAR" = "x{" ]]
-      then
-        echo "Input looks like a single object, wrapping into an array" 1>&2
-        INPUT='['"$INPUT"']'
-      fi
-
-      echo "$INPUT" | "$haskellVersion"
-    '';
+    name  = "recurrentBucket";
+    paths = [ bash jq runWeka ];
+    file  = haskellVersion;
   };
 
   check = bucketCheck {
