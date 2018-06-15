@@ -181,7 +181,7 @@ with rec {
     '';
 
   go = wrap {
-    name = "get-ground-truths.rkt";
+    name = "get-ground-truths";
     file = haskellVersion;
   };
 
