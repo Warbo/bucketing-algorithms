@@ -2,8 +2,8 @@
 # proportion of ground truth theorems which apply to the resulting buckets.
 #
 # Write output to JSON for archiving.
-{ benchmarkingCommands, jq, lib, makeSamples, nixpkgs, runCommand, tebenchmark,
-  testData, wrap }:
+{ averageProportions, benchmarkingCommands, calculateProportions, jq, lib,
+  makeSamples, nixpkgs, runCommand, tebenchmark, testData, wrap }:
 with { inherit (builtins) concatStringsSep map; };
 
 given: with rec {
@@ -83,6 +83,15 @@ given: with rec {
 
   addAllBuckets = samples: addHashBuckets (addRecurrentBuckets samples);
 
-  proportionsOf = builtins.trace "proportionsOf not implemented" (x: x);
+  proportionsOf = data: runCommand "proportions-of"
+    { inherit data calculateProportions; }
+    ''"$calculateProportions" < "$data" > "$out"'';
+
+  averagesOf = data: runCommand "averages-of"
+    { inherit averageProportions data; }
+    ''"$averageProportions" < "$data" > "$out"'';
 };
-proportionsOf (groundTruthsOf (addAllBuckets samples))
+rec {
+  proportions = proportionsOf (groundTruthsOf (addAllBuckets samples));
+  averages    = averagesOf proportions;
+}

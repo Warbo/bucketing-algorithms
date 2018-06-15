@@ -58,6 +58,7 @@ fix (self: rec {
   # argument values from the 'self' attrset.
   callPackage = nixpkgs.callPackage ./callPackage.nix { inherit self; };
 
+  averageProportions    = callPackage ./averageProportions.nix    {};
   benchmarkingCommands  = callPackage ./benchmarkingCommands.nix  {};
   bucketCheck           = callPackage ./bucketCheck.nix           {};
   bucketProportions     = callPackage ./bucketProportions.nix     {};
