@@ -4,14 +4,14 @@ mkBin {
   name   = "runWeka";
   paths = [ bash jq weka jre perl ];
   vars  = {
-    cmd = wrap {
+    wekaCli = wrap {
       name   = "weka-cli";
       paths  = [ bash jre ];
       vars   = { inherit weka; };
       script = ''
         #!/usr/bin/env bash
-        java -client -XX:+TieredCompilation -XX:TieredStopAtLevel=1 \
-             $JVM_OPTS -cp "$weka/share/weka/weka.jar" "$@"
+        #-client -XX:+TieredCompilation -XX:TieredStopAtLevel=1 \
+        java $JVM_OPTS -cp "$weka/share/weka/weka.jar" "$@"
       '';
     };
   };
@@ -77,8 +77,8 @@ mkBin {
         INPUT=$(cat)
 
         echo "$INPUT" |
-            "$weka-cli" weka.filters.unsupervised.attribute.AddCluster \
-                        -W "weka.clusterers.SimpleKMeans -N $CLUSTERS -S 42" -I last
+            "$wekaCli" weka.filters.unsupervised.attribute.AddCluster \
+                       -W "weka.clusterers.SimpleKMeans -N $CLUSTERS -S 42" -I last
     }
 
     function showClusters {
