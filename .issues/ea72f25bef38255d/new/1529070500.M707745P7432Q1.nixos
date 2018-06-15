@@ -1,0 +1,61 @@
+From: Chris Warburton
+Date: Fri, 15 Jun 2018 14:35:11 +0100
+State: new
+Subject: Reduce recurrent clustering overhead
+Message-Id: <ea72f25bef38255d-0-artemis@nixos>
+
+Recurrent clustering is *slow*. I had the time_recurrent benchmark do
+the bucketing within an strace wrapper (strace- ttt -f bucketing-script)
+
+Digging through the results, we can see the following activity
+(timestamps on the left, my summary of what's happening on the right):
+
+    1529062763.855282 Start bash wrapper
+    1529062763.988409 Start astsOf
+    1529062765.163342 End astsOf
+    1529062765.169085 Start jq
+    1529062765.186038 Start recurrentBucket
+    1529062765.383332 Start recurrent-bucket
+    1529062765.595589 Start runWeka
+    1529062767.664867 Start weka-cli
+    1529062767.882880 Start java
+    1529062776.296605 Stat weka.jar
+    1529062779.998028 Reading in arff data
+    1529062781.308914 Java finished
+    1529062781.337793 Start recurrentBucket (next loop)
+
+The script passes its input to astsOf, which takes a couple of seconds
+to run. It then loops through bucket sizes and calls recurrentBucket for
+each. We see there's about 16 seconds between the first and second calls
+of recurrentBucket, so that's how long the loop iteration took.
+
+There are a few layers of wrapping going on, but we see that
+recurrentBucket gets to runWeka quite quickly. runWeka does some
+processing of its input, which takes a couple of seconds, then it runs
+weka-cli which starts java.
+
+The java process takes about 9 seconds before it even looks at the
+weka.jar file, so that's basically all overhead. A few seconds later
+there is some data being read in (the "arff" format that weka uses);
+note that this *could* be delayed due to the generating pipeline being
+slow, i.e. java's startup overhead could be happening concurrently with
+some other slow processing, which speeding up java wouldn't fix. Still,
+I doubt that the other processing is taking 9 seconds; and even if so,
+there are some quick wins to be had by e.g. switching it to Haskell
+rather than having bash firing off a whole bunch of short-lived
+processes.
+
+A couple of seconds after this data is read, everything closes down and
+the next iteration starts.
+
+So what can we do to reduce this overhead? The biggest win would come
+from speeding up Java's startup. I'm guessing that this is a well-known
+problem with a lot of existing solutions; some things which come to mind
+are (in order of ease):
+
+ - Tweaking the java options, to disable stuff we don't need, etc.
+ - Starting a single 'server' process, which we re-use for all of our
+   weka calls.
+ - Snapshotting the Java process once it's finished its startup stuff,
+   and running that snapshot image rather than the normal java process.
+ - Using a faster implementation, like compiling with GCJ.

@@ -18,5 +18,5 @@ def load_command(c):
     return loads(getenv('commands'))[c]
 
 def run_on(cmd, stdin):
-    p = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+    p = Popen(cmd, stdin=PIPE, stdout=PIPE)
     return p.communicate(stdin.encode('utf-8'))
