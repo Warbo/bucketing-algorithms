@@ -10,7 +10,8 @@ mkBin {
       vars   = { inherit weka; };
       script = ''
         #!/usr/bin/env bash
-        java -client $JVM_OPTS -cp "$weka/share/weka/weka.jar" "$@"
+        java -client -XX:+TieredCompilation -XX:TieredStopAtLevel=1 \
+             $JVM_OPTS -cp "$weka/share/weka/weka.jar" "$@"
       '';
     };
   };
