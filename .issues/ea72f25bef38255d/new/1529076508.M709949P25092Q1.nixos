@@ -1,0 +1,15 @@
+From: Chris Warburton
+Date: Fri, 15 Jun 2018 16:24:35 +0100
+Subject: Re: Reduce recurrent clustering overhead
+Message-Id: <ea72f25bef38255d-f9719e34f4c5744f-artemis@nixos>
+References: <ea72f25bef38255d-0-artemis@nixos>
+In-Reply-To: <ea72f25bef38255d-0-artemis@nixos>
+
+Tried adding '-client' and single-tier compilation options to java
+invocation, but it didn't make much difference.
+
+Looks like "nailgun" is a simple way to turn a Java commandline
+application into a long-running server process which we can invoke over
+and over without suffering the startup overhead:
+
+http://martiansoftware.com/nailgun/quickstart.html
