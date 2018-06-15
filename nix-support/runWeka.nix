@@ -1,8 +1,114 @@
-{ callPackage, fetchFromGitHub }:
+{ jq, jre, makeWrapper, perl, runCommand, stdenv, weka, writeScript }:
 
-callPackage (fetchFromGitHub {
-  owner  = "Warbo";
-  repo   = "run-weka";
-  rev    = "c4033ce";
-  sha256 = "1zdmzznlrdz6ydsd2bm18bjb1xpiq840dvb6x64m4vhxddl0gg33";
-}) {}
+stdenv.mkDerivation {
+  inherit jq jre perl weka;
+
+  name        = "run-weka";
+  buildInputs = [ makeWrapper ];
+
+  src = ''
+    #!/usr/bin/env bash
+
+    set -e
+
+    function msg {
+        echo -e "$1" 1>&2
+    }
+
+    RAW=$(cat)
+    INLINES=$(echo "$RAW" | jq '[.[] | select(has("features")) | select(has("tocluster")) | select(.tocluster == true)]')
+    CSV=""
+
+    NUM=$(echo "$INLINES" | jq 'length')
+    [[ "$NUM" -eq 0 ]] && {
+        msg "No ASTs with features, skipping"
+        echo "[]"
+        exit 0
+    }
+
+    # Default to ceil(sqrt($NUM / 2))
+    [[ -z "$CLUSTERS" ]] && {
+        CLUSTERS=$(perl -e "use POSIX; print ceil(sqrt($NUM / 2)), \"\n\"")
+        msg "No cluster number given, using '$CLUSTERS'"
+    }
+
+    function getCsv {
+        if [ -z "$CSV" ]
+        then
+            CSV=$(echo "$INLINES" | jq -r -c '.[] | select(has("features")) | .features' | tr -d "[]")
+            msg "CSV COUNT $(echo "$CSV" | wc -l)"
+        fi
+        echo "$CSV"
+    }
+
+    function elemCount {
+        # Count the commas in the first row and add 1
+        # TODO: Use JSON arrays for features
+        NUMS=$(getCsv | head -n 1 | sed -e 's/[^,]//g' | awk '{ print length; }')
+        echo $((NUMS + 1))
+    }
+
+    function getArff {
+        # The data is currently unrelated
+        echo "@relation empty"
+
+        # Type annotations for columns (they're all real numbers)
+        COUNT=$(elemCount)
+        for (( i=1; i<=COUNT; i++ ))
+        do
+            echo "@attribute '$i' real"
+        done
+
+        # The data to cluster
+        echo "@data"
+        getCsv
+    }
+
+    function runWeka {
+        INPUT=$(cat)
+
+        echo "$INPUT" |
+            weka-cli weka.filters.unsupervised.attribute.AddCluster \
+                     -W "weka.clusterers.SimpleKMeans -N $CLUSTERS -S 42" -I last
+    }
+
+    function showClusters {
+        getArff | runWeka
+    }
+
+    function extractClusters {
+        # Chop the final "clusterX" column off the Weka output
+        LINES=$(getArff | wc -l)
+
+        # shellcheck disable=SC2016
+        showClusters                  |
+            grep -A "$LINES" "^@data" |
+            grep -o "cluster[0-9]*$"  |
+            jq -R '.'                 |
+            jq -s --argfile asts <(echo "$INLINES") \
+               '. | to_entries | map($asts[.key] + {cluster: .value})'
+    }
+
+    extractClusters | jq 'map(. + {cluster: (.cluster | .[7:] | tonumber)})'
+  '';
+
+  cmd = writeScript "weka-cli" ''
+    #!/usr/bin/env bash
+    java $JVM_OPTS -cp "$WEKA/share/weka/weka.jar" "$@"
+  '';
+
+  unpackPhase  = "true";  # Nothing to unpack
+  installPhase = ''
+    mkdir -p "$out/bin"
+
+    makeWrapper "$src" "$out/bin/runWeka" \
+    --prefix PATH : "$jq/bin"           \
+    --prefix PATH : "$weka/bin"         \
+    --prefix PATH : "$jre/bin"          \
+    --prefix PATH : "$perl/bin"
+
+    makeWrapper "$cmd" "$out/bin/weka-cli" \
+    --prefix PATH : "$jre/bin" \
+    --set    WEKA   "$weka"
+  '';
+}
