@@ -1,12 +1,20 @@
-{ jq, jre, makeWrapper, perl, runCommand, stdenv, weka, writeScript }:
+{ bash, jq, jre, mkBin, perl, weka, wrap }:
 
-stdenv.mkDerivation {
-  inherit jq jre perl weka;
-
-  name        = "run-weka";
-  buildInputs = [ makeWrapper ];
-
-  src = ''
+mkBin {
+  name   = "runWeka";
+  paths = [ bash jq weka jre perl ];
+  vars  = {
+    cmd = wrap {
+      name   = "weka-cli";
+      paths  = [ bash jre ];
+      vars   = { inherit weka; };
+      script = ''
+        #!/usr/bin/env bash
+        java $JVM_OPTS -cp "$weka/share/weka/weka.jar" "$@"
+      '';
+    };
+  };
+  script = ''
     #!/usr/bin/env bash
 
     set -e
@@ -68,8 +76,8 @@ stdenv.mkDerivation {
         INPUT=$(cat)
 
         echo "$INPUT" |
-            weka-cli weka.filters.unsupervised.attribute.AddCluster \
-                     -W "weka.clusterers.SimpleKMeans -N $CLUSTERS -S 42" -I last
+            "$weka-cli" weka.filters.unsupervised.attribute.AddCluster \
+                        -W "weka.clusterers.SimpleKMeans -N $CLUSTERS -S 42" -I last
     }
 
     function showClusters {
@@ -90,25 +98,5 @@ stdenv.mkDerivation {
     }
 
     extractClusters | jq 'map(. + {cluster: (.cluster | .[7:] | tonumber)})'
-  '';
-
-  cmd = writeScript "weka-cli" ''
-    #!/usr/bin/env bash
-    java $JVM_OPTS -cp "$WEKA/share/weka/weka.jar" "$@"
-  '';
-
-  unpackPhase  = "true";  # Nothing to unpack
-  installPhase = ''
-    mkdir -p "$out/bin"
-
-    makeWrapper "$src" "$out/bin/runWeka" \
-    --prefix PATH : "$jq/bin"           \
-    --prefix PATH : "$weka/bin"         \
-    --prefix PATH : "$jre/bin"          \
-    --prefix PATH : "$perl/bin"
-
-    makeWrapper "$cmd" "$out/bin/weka-cli" \
-    --prefix PATH : "$jre/bin" \
-    --set    WEKA   "$weka"
   '';
 }
