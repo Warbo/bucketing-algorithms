@@ -10,8 +10,14 @@ mkBin {
       vars   = { inherit weka; };
       script = ''
         #!/usr/bin/env bash
-        java -client -XX:+TieredCompilation -XX:TieredStopAtLevel=1 \
-             $JVM_OPTS -cp "$weka/share/weka/weka.jar" "$@"
+        if [[ -n "$NAILGUN_PORT" ]]
+        then
+          echo "Using nailgun on port $NAILGUN_PORT" 1>&2
+          ng "$@"
+        else
+          echo "No NAILGUN_PORT, using standalone jvm" 1>&2
+          java $JVM_OPTS -cp "$weka/share/weka/weka.jar" "$@"
+        fi
       '';
     };
   };
@@ -78,7 +84,8 @@ mkBin {
 
         echo "$INPUT" |
             "$wekaCli" weka.filters.unsupervised.attribute.AddCluster \
-                       -W "weka.clusterers.SimpleKMeans -N $CLUSTERS -S 42" -I last
+                       -W "weka.clusterers.SimpleKMeans -N $CLUSTERS -S 42" \
+                       -I last
     }
 
     function showClusters {

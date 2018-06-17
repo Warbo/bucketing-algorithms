@@ -88,5 +88,6 @@ fix (self: rec {
   runWeka               = callPackage ./runWeka.nix               {};
   tebenchmark           = callPackage ./tebenchmark.nix           {};
   tryTip                = callPackage ./tryTip.nix                {};
+  withNailgun           = callPackage ./withNailgun.nix           {};
   withNix               = callPackage ./withNix.nix               {};
 })
