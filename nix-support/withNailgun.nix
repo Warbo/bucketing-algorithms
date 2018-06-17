@@ -51,7 +51,7 @@ attrsToDirs {
     withNailgun = wrap {
       name   = "withNailgun";
       paths  = [ bash ];
-      vars   = { inherit ngServer; };
+      vars   = { inherit ngClient ngServer; };
       script = ''
         #!/usr/bin/env bash
         set -e
@@ -65,7 +65,7 @@ attrsToDirs {
 
         # Trap exit, so we can shut down the nailgun server
         function ngStop {
-          "${ngClient}" ng-stop
+          "$ngClient" ng-stop
         }
         trap ngStop EXIT
 
