@@ -56,18 +56,33 @@ attrsToDirs {
         #!/usr/bin/env bash
         set -e
 
+        if [[ -n "$NAILGUN_PORT" ]]
+        then
+          echo "Nailgun already running, sticking with that one" 1>&2
+          "$@"
+          CODE="$?"
+          exit "$CODE"
+        fi
+
         # Start nailgun server, daemonise it to background and read off the port
-        read -r first_line < <("$ngServer" 127.0.0.1:0 &)
+        echo "Starting nailgun server" 1>&2
+        coproc "$ngServer" 127.0.0.1:0
+        SERVER_OUT="${"$" + "{COPROC[0]}"}"
+        SERVER_PID="$COPROC_PID"
+        read -ru "${"$" + "{COPROC[0]}"}" first_line
+
+        # Trap exit, so we can shut down the nailgun server (and other children)
+        function killNailgun {
+          echo "Stopping nailgun server (PID $SERVER_PID)" 1>&2
+          kill "$SERVER_PID"
+        }
+        trap killNailgun EXIT
+
         NAILGUN_PORT=$(echo "$first_line" | sed -e 's/port 0//g'       |
                                             grep -o 'port [0-9][0-9]*' |
                                             grep -o '[0-9]*')
         export NAILGUN_PORT
-
-        # Trap exit, so we can shut down the nailgun server
-        function ngStop {
-          "$ngClient" ng-stop
-        }
-        trap ngStop EXIT
+        echo "Nailgun started on port $NAILGUN_PORT" 1>&2
 
         # Run whatever command we've been given
         "$@"
