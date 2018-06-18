@@ -25,7 +25,7 @@ fix (self: rec {
 
   inherit (nix-config)
     # Pristine releases of nixpkgs. Useful for avoiding known incompatibilities.
-    nixpkgs1603 nixpkgs1609 nixpkgs1709
+    nixpkgs1603 nixpkgs1609 nixpkgs1709 nixpkgs1803
 
     # Helper functions, etc.
     allDrvsIn asv attrsToDirs backtrace composeWithArgs fail inNixedDir
