@@ -1,8 +1,8 @@
 # Commands which split their input into various "buckets", e.g. based on
 # clustering. We don't do any exploration or reduction, we just look at the
 # resulting buckets.
-{ bash, bc, bucketCheck, haskellPackages, jq, mkBin,
-  runCommand, runWeka, stdenv, withDeps, wrap, writeScript }:
+{ bash, bucketCheck, haskellPackages, mkBin, runCommand, runWeka, withDeps,
+  withNailgun, wrap, writeScript }:
 
 with rec {
   haskellVersion = runCommand "recurrent-bucket"
@@ -31,10 +31,7 @@ with rec {
         import           ML4HSFE.Loop
         import           ML4HSFE.Outer
         import           System.Environment
-        import           System.Exit
         import           System.IO
-        import qualified System.Process             as P
-        import qualified System.Process.ByteString  as PB
 
         cluster s Nothing      height        = cluster s (Just "30") height
         cluster s width        Nothing       = cluster s width       (Just "30")
@@ -102,8 +99,18 @@ with rec {
 
   cmd = mkBin {
     name  = "recurrentBucket";
-    paths = [ bash jq runWeka ];
-    file  = haskellVersion;
+    paths = [ bash runWeka withNailgun ];
+    script = ''
+      #!/usr/bin/env bash
+      if [[ -n "$NAILGUN_PORT" ]]
+      then
+        echo "Bucketing with nailgun on port $NAILGUN_PORT" 1>&2
+        ng "$@"
+      else
+        echo "No NAILGUN_PORT, starting short-lived nailgun" 1>&2
+        withNailgun "${haskellVersion}" "$@"
+      fi
+    '';
   };
 
   check = bucketCheck {
