@@ -105,7 +105,7 @@ with rec {
       if [[ -n "$NAILGUN_PORT" ]]
       then
         echo "Bucketing with nailgun on port $NAILGUN_PORT" 1>&2
-        ng "$@"
+        "${haskellVersion}" "$@"
       else
         echo "No NAILGUN_PORT, starting short-lived nailgun" 1>&2
         withNailgun "${haskellVersion}" "$@"
