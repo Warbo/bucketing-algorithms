@@ -1,4 +1,4 @@
-{ bash, jq, jre, mkBin, perl, weka, wrap }:
+{ bash, jq, jre, mkBin, perl, weka, withNailgun, wrap }:
 
 mkBin {
   name   = "runWeka";
@@ -6,7 +6,7 @@ mkBin {
   vars  = {
     wekaCli = wrap {
       name   = "weka-cli";
-      paths  = [ bash jre ];
+      paths  = [ bash jre withNailgun ];
       vars   = { inherit weka; };
       script = ''
         #!/usr/bin/env bash
@@ -15,8 +15,8 @@ mkBin {
           echo "Using nailgun on port $NAILGUN_PORT" 1>&2
           ng "$@"
         else
-          echo "No NAILGUN_PORT, using standalone jvm" 1>&2
-          java $JVM_OPTS -cp "$weka/share/weka/weka.jar" "$@"
+          echo "No NAILGUN_PORT set, aborting" 1>&2
+          exit 1
         fi
       '';
     };
