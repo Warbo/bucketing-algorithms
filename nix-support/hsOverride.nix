@@ -39,8 +39,8 @@ with rec {
     ML4HSFE = get {
       path   = <ml4hsfe>;
       repo   = "ml4hsfe";
-      rev    = "ecbc833";
-      sha256 = "0sgkc6kbyiilv4hs1485lrhbb2ja06bg9yrzd3kylw4l4jlk9lmn";
+      rev    = "e4e4cea";
+      sha256 = "1kcnhbkgfp0akp0g0jxh11f1zn96jybgl7rniwabhxpr9hszj3kn";
     } {};
 
     mlspec = get {

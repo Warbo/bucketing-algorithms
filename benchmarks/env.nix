@@ -15,10 +15,7 @@ with fixed.lib;
 
 fixed.mkBin {
   name  = "python";
-  paths = with fixed.nixpkgs1609; [
-    (python3.withPackages (p: []))
-    fixed.withNailgun
-  ];
+  paths = with fixed.nixpkgs1609; [ (python3.withPackages (p: [])) ];
   vars  = {
     inherit root;
 
@@ -37,6 +34,6 @@ fixed.mkBin {
   };
   script = ''
     #!/usr/bin/env bash
-    withNailgun python3 "$@"
+    exec python3 "$@"
   '';
 }

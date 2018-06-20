@@ -85,9 +85,7 @@ fix (self: rec {
   package               = callPackage ./package.nix               {};
   pkgName               = callPackage ./pkgName.nix               {};
   recurrentBucket       = callPackage ./recurrentBucket.nix       {};
-  runWeka               = callPackage ./runWeka.nix               {};
   tebenchmark           = callPackage ./tebenchmark.nix           {};
   tryTip                = callPackage ./tryTip.nix                {};
-  withNailgun           = callPackage ./withNailgun.nix           {};
   withNix               = callPackage ./withNix.nix               {};
 })

@@ -1,8 +1,8 @@
 # Commands which split their input into various "buckets", e.g. based on
 # clustering. We don't do any exploration or reduction, we just look at the
 # resulting buckets.
-{ bash, bucketCheck, haskellPackages, mkBin, runCommand, runWeka, withDeps,
-  withNailgun, wrap, writeScript }:
+{ bash, bucketCheck, haskellPackages, hsOverride, mkBin, nixpkgs1709,
+  runCommand, withDeps, wrap, writeScript }:
 
 with rec {
   haskellVersion = runCommand "recurrent-bucket"
@@ -36,10 +36,12 @@ with rec {
         cluster s Nothing      height        = cluster s (Just "30") height
         cluster s width        Nothing       = cluster s width       (Just "30")
         cluster s (Just width) (Just height) = do
-          () <- setClusters s
-          asts <- clusterLoop (handleString (read width)
-                                            (read height)
-                                            (LBS.fromStrict s))
+          c <- getClusters s
+          let asts = I.runIdentity
+                       (clusterLoop (pureKmeans (Just c))
+                                    (handleString (read width)
+                                                  (read height)
+                                                  (LBS.fromStrict s)))
           LBS.putStr (processAsts asts)
 
         bsToAsts :: BS.ByteString -> A.Value
@@ -63,11 +65,11 @@ with rec {
                                                    (H.delete "features" o))]
                                                h
 
-        setClusters :: BS.ByteString -> IO ()
-        setClusters s = do
+        getClusters :: BS.ByteString -> IO Int
+        getClusters s = do
           c  <- lookupEnv "CLUSTERS"
           cs <- lookupEnv "CLUSTER_SIZE"
-          setEnv "CLUSTERS" (show (clusters s c cs))
+          pure (clusters s c cs)
 
         clusters :: BS.ByteString -> Maybe String -> Maybe String -> Int
         clusters s c cs = fromJust (fromSize <|> fromEnv <|> Just fromIn)
@@ -98,19 +100,8 @@ with rec {
     '';
 
   cmd = mkBin {
-    name  = "recurrentBucket";
-    paths = [ bash runWeka withNailgun ];
-    script = ''
-      #!/usr/bin/env bash
-      if [[ -n "$NAILGUN_PORT" ]]
-      then
-        echo "Bucketing with nailgun on port $NAILGUN_PORT" 1>&2
-        "${haskellVersion}" "$@"
-      else
-        echo "No NAILGUN_PORT, starting short-lived nailgun" 1>&2
-        withNailgun "${haskellVersion}" "$@"
-      fi
-    '';
+    name = "recurrentBucket";
+    file = haskellVersion;
   };
 
   check = bucketCheck {

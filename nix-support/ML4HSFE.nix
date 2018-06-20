@@ -1,5 +1,5 @@
 # ML4HSFE executable from its Haskell package, with its test script checked
-{ haskellPackages, jq, runCommand, runWeka, withDeps }:
+{ haskellPackages, jq, runCommand, withDeps }:
 
 with {
   test = runCommand "ML4HSFE-test-suite"
@@ -7,10 +7,10 @@ with {
       ml4hsfe     = haskellPackages.ML4HSFE.src;
       buildInputs = [
         (haskellPackages.ghcWithPackages (h: [
-          h.cabal-install h.ghc h.ML4HSFE h.quickspec h.tasty h.tasty-quickcheck
+          h.cabal-install h.ghc h.kmeans h.ML4HSFE h.quickspec h.tasty
+          h.tasty-quickcheck
         ]))
         jq
-        runWeka
       ];
     }
     ''
