@@ -29,20 +29,6 @@ with rec {
 
     # Our packages
 
-    AstPlugin = get {
-      path   = <ast-plugin>;
-      repo   = "ast-plugin";
-      rev    = "a04f6fe";
-      sha256 = "1gmkv4l38vpvhg2h8dwv4gf8dq1d0lr0zxd5j9szi90xb8nl2241";
-    } {};
-
-    GetDeps = get {
-      path   = <get-deps>;
-      repo   = "getDeps";
-      rev    = "7c02fbc";
-      sha256 = "19g1lyaplclnlyh7y3li08937bqgk58dsblz12hd290crmg999f0";
-    } {};
-
     HS2AST = get {
       path   = <hs2ast>;
       repo   = "hs2ast";
@@ -56,38 +42,6 @@ with rec {
       rev    = "e4e4cea";
       sha256 = "1kcnhbkgfp0akp0g0jxh11f1zn96jybgl7rniwabhxpr9hszj3kn";
     } {};
-
-    mlspec = get {
-      path   = <mlspec>;
-      repo   = "mlspec";
-      rev    = "8f97e7f";
-      sha256 = "1ay4zw55k659cdpg1mbb3jcdblabyajpj657v4fc6wvydqvia6d5";
-    } {};
-
-    mlspec-helper = get {
-      path   = <mlspec-helper>;
-      repo   = "mlspec-helper";
-      rev    = "d794706";
-      sha256 = "0vlr3ar1zwk0ykbzmg47j1yv1ba8gf6nzqj10bfy60nii91z7slh";
-    } {};
-
-    nix-eval = get {
-      path   = <nix-eval>;
-      repo   = "nix-eval";
-      rev    = "53d18a2";
-      sha256 = "0rplpygiqn6f9aqi09dr67xidb1bks9xnxxrpzi3bq67bdvjzvh1";
-    } {};
-
-    reduce-equations = get {
-      path   = <reduce-equations>;
-      repo   = "reduce-equations";
-      rev    = "111af37";
-      sha256 = "14164562v6w151qxzrhilxacd1xwb48qf7l39nfzf313vw6qj3xc";
-    } {
-      haskell-src-exts = hackagePkg "haskell-src-exts" "1.19.0" {
-        pretty-show = hackagePkg "pretty-show" "1.6.12" {};
-      };
-    };
 
     runtime-arbitrary = get {
       path   = <runtime-arbitrary>;

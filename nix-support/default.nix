@@ -51,9 +51,6 @@ fix (self: rec {
   inherit (haskellTE)
     testData;
 
-  inherit (runTypesScriptData)
-    runTypesScript;
-
   # Imports a file and calls the function it contains, automatically looking up
   # argument values from the 'self' attrset.
   callPackage = nixpkgs.callPackage ./callPackage.nix { inherit self; };
@@ -64,11 +61,6 @@ fix (self: rec {
   bucketProportions     = callPackage ./bucketProportions.nix     {};
   calculateProportions  = callPackage ./calculateProportions.nix  {};
   callHackage           = callPackage ./callHackage.nix           {};
-  checkHsEnv            = callPackage ./checkHsEnv.nix            {};
-  checkStderr           = callPackage ./checkStderr.nix           {};
-  extraHaskellPackages  = callPackage ./extraHaskellPackages.nix  {};
-  filterToSampled       = callPackage ./filterToSampled.nix       {};
-  getDepsScript         = callPackage ./getDepsScript.nix         {};
   hashBucket            = callPackage ./hashBucket.nix            {};
   haskellPackages       = callPackage ./haskellPackages.nix       {};
   haskellPkgNameVersion = callPackage ./haskellPkgNameVersion.nix {};
