@@ -5,7 +5,7 @@ with lib;
 dir:
   assert typeOf dir == "path" || isString dir || isDerivation dir ||
          abort "nixedHsPkg: dir should be str|path|drv, given '${typeOf dir}'";
-  runCommand "nixedHsPkg"
+  trace "Warning: nixedHsPkg is deprecated in favour of callCabal2nix" runCommand "nixedHsPkg"
     {
       inherit dir;
       buildInputs = [ cabal2nix ];

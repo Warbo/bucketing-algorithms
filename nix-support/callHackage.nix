@@ -27,4 +27,4 @@ with rec {
   };
 };
 
-hackage2nix
+builtins.trace "Warning: nix-support/callHackage.nix is deprecated; use the version from nixpkgs" hackage2nix

@@ -63,21 +63,14 @@ fix (self: rec {
   callHackage           = callPackage ./callHackage.nix           {};
   hashBucket            = callPackage ./hashBucket.nix            {};
   haskellPackages       = callPackage ./haskellPackages.nix       {};
-  haskellPkgNameVersion = callPackage ./haskellPkgNameVersion.nix {};
   haskellPkgToAsts      = callPackage ./haskellPkgToAsts.nix      {};
   haskellPkgToRawAsts   = callPackage ./haskellPkgToRawAsts.nix   {};
   haskellTE             = callPackage ./haskellTE.nix             {};
-  haveVar               = callPackage ./haveVar.nix               {};
-  hsNameVersion         = callPackage ./hsNameVersion.nix         {};
   hsOverride            = callPackage ./hsOverride.nix            {};
-  makeHaskellPkgNixable = callPackage ./makeHaskellPkgNixable.nix {};
   makeSamples           = callPackage ./makeSamples.nix           {};
   ML4HSFE               = callPackage ./ML4HSFE.nix               {};
   nixedHsPkg            = callPackage ./nixedHsPkg.nix            {};
   package               = callPackage ./package.nix               {};
-  pkgName               = callPackage ./pkgName.nix               {};
   recurrentBucket       = callPackage ./recurrentBucket.nix       {};
   tebenchmark           = callPackage ./tebenchmark.nix           {};
-  tryTip                = callPackage ./tryTip.nix                {};
-  withNix               = callPackage ./withNix.nix               {};
 })
