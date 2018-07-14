@@ -42,29 +42,69 @@ self: super:
 
 with builtins;
 with super.lib;
-
-{
+with {
+  # Imports a file and calls it as a function with args from 'self' (allowing
+  # both 'self' and 'super' to be given as args if desired). The result is
+  # overridable by default; to avoid this we can return a set with a 'def'
+  # attribute; this also allows 'tests' to be returned alongside.
+  call = f:
+    with {
+      result = self.newScope { inherit self super; }
+                             (./nix-support + "/${f}.nix")
+                             {};
+    };
+    if result.removeOverrides or false
+       then result.value
+       else result;
+};
+fold (n: old: old // {
+       "${n}"               = call n;
+       bucketing-algorithms = old.bucketing-algorithms // { "${n}" = call n; };
+     }) { bucketing-algorithms = {}; } [
+  "averageProportions"
+  "benchmark"
+  "benchmarkingCommands"
+  "bucketCheck"
+  "bucketProportions"
+  "calculateProportions"
+  "callHackage"
+  "hashBucket"
+  "haskellPackages"
+  "haskellPkgToAsts"
+  "haskellPkgToRawAsts"
+  "haskellSources"
+  "haskellTE"
+  "hsOverride"
+  "makeSamples"
+  "ML4HSFE"
+  "nix-helpers"
+  "nixedHsPkg"
+  "package"
+  "performance"
+  "recurrentBucket"
+  "tebenchmark"
+] // {
   # The main nixpkgs repo, augmented with nix-config, depending on un/stable
   inherit (import ./nixpkgs.nix {})
     nix-config nix-config-src nixpkgs;
 
-  inherit (nix-config)
+  inherit (self.nix-helpers)
     # Pristine releases of nixpkgs. Useful for avoiding known incompatibilities.
     nixpkgs1603 nixpkgs1609 nixpkgs1709 nixpkgs1803
 
     # Helper functions, etc.
-    allDrvsIn asv attrsToDirs backtrace composeWithArgs fail inNixedDir
+    allDrvsIn asv attrsToDirs backtrace composeWithArgs die fail inNixedDir
     latestGit mkBin nixListToBashArray nothing pipeToNix repo reverse
     sanitiseName stableHackageDb stripOverrides timeout tryElse unlines unpack
     withDeps wrap;
 
   # Fixed versions to avoid known breakages
 
-  inherit (nixpkgs1603)
+  inherit (self.nixpkgs1603)
     # Args differ in new versions, which breaks ./nix-support/haskellPackages.nix scripts
     cabal2nix;
 
-  inherit (nixpkgs1609)
+  inherit (self.nixpkgs1609)
     # The quoting is different in other versions, which breaks e.g. wrap
     makeWrapper
 
@@ -73,32 +113,6 @@ with super.lib;
 
   # Cases where we want both the attribute set and its attributes available
 
-  inherit (haskellTE)
+  inherit (self.haskellTE)
     testData;
-
-  # Imports a file and calls the function it contains, automatically looking up
-  # argument values from the 'self' attrset.
-  callPackage = nixpkgs.callPackage ./nix-support/callPackage.nix { inherit self; };
-
-  averageProportions    = callPackage ./nix-support/averageProportions.nix   {};
-  benchmark             = callPackage ./nix-support/benchmark.nix            {};
-  benchmarkingCommands  = callPackage ./nix-support/benchmarkingCommands.nix {};
-  bucketCheck           = callPackage ./nix-support/bucketCheck.nix          {};
-  bucketProportions     = callPackage ./nix-support/bucketProportions.nix    {};
-  calculateProportions  = callPackage ./nix-support/calculateProportions.nix {};
-  callHackage           = callPackage ./nix-support/callHackage.nix          {};
-  hashBucket            = callPackage ./nix-support/hashBucket.nix           {};
-  haskellPackages       = callPackage ./nix-support/haskellPackages.nix      {};
-  haskellPkgToAsts      = callPackage ./nix-support/haskellPkgToAsts.nix     {};
-  haskellPkgToRawAsts   = callPackage ./nix-support/haskellPkgToRawAsts.nix  {};
-  haskellSources        = callPackage ./nix-support/haskellSources.nix       {};
-  haskellTE             = callPackage ./nix-support/haskellTE.nix            {};
-  hsOverride            = callPackage ./nix-support/hsOverride.nix           {};
-  makeSamples           = callPackage ./nix-support/makeSamples.nix          {};
-  ML4HSFE               = callPackage ./nix-support/ML4HSFE.nix              {};
-  nixedHsPkg            = callPackage ./nix-support/nixedHsPkg.nix           {};
-  package               = callPackage ./nix-support/package.nix              {};
-  performance           = callPackage ./nix-support/performance.nix          {};
-  recurrentBucket       = callPackage ./nix-support/recurrentBucket.nix      {};
-  tebenchmark           = callPackage ./nix-support/tebenchmark.nix          {};
 }
