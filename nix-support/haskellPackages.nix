@@ -1,4 +1,4 @@
-{ die, hsOverride, nixpkgs1803 }:
+{ die, hsOverride, lib, nixpkgs1803 }:
 
 with builtins;
 with rec {

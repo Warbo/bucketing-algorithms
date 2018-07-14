@@ -1,26 +1,25 @@
 # ML4HSFE executable from its Haskell package, with its test script checked
 { haskellPackages, jq, runCommand, withDeps }:
 
-with {
-  test = runCommand "ML4HSFE-test-suite"
+rec {
+  def   = haskellPackages.ML4HSFE;
+  tests = runCommand "ML4HSFE-test-suite"
     {
-      ml4hsfe     = haskellPackages.ML4HSFE.src;
+      ml4hsfe     = def.src;
       buildInputs = [
         (haskellPackages.ghcWithPackages (h: [
           h.cabal-install h.ghc h.kmeans h.ML4HSFE h.quickspec h.tasty
           h.tasty-quickcheck
-        ]))
-        jq
-      ];
+      ]))
+      jq
+    ];
     }
-    ''
-      set -e
-      export HOME="$PWD"
-      cp -r "$ml4hsfe" ./ml4hsfe
-      chmod +w -R ./ml4hsfe
-      cd ./ml4hsfe
-      bash ./test.sh
-      mkdir "$out"
-    '';
-};
-withDeps [ test ] haskellPackages.ML4HSFE
+  ''
+    export HOME="$PWD"
+    cp -r "$ml4hsfe" ./ml4hsfe
+    chmod +w -R ./ml4hsfe
+    cd ./ml4hsfe
+    bash ./test.sh
+    mkdir "$out"
+  '';
+}

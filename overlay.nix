@@ -83,7 +83,6 @@ fold appendDef { bucketing-algorithms = {}; bucketing-algorithms-tests = {}; } [
   "makeSamples"
   "ML4HSFE"
   "nix-helpers"
-  "nixedHsPkg"
   "package"
   "performance"
   "recurrentBucket"
@@ -100,8 +99,8 @@ fold appendDef { bucketing-algorithms = {}; bucketing-algorithms-tests = {}; } [
     # Helper functions, etc.
     allDrvsIn asv attrsToDirs backtrace composeWithArgs die fail inNixedDir
     latestGit mkBin nixListToBashArray nothing pipeToNix repo reverse
-    sanitiseName stableHackageDb stripOverrides timeout tryElse unlines unpack
-    withDeps wrap;
+    runCabal2nix sanitiseName stableHackageDb stripOverrides timeout tryElse
+    unlines unpack withDeps wrap;
 
   # Fixed versions to avoid known breakages
 
