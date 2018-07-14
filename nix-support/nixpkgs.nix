@@ -12,6 +12,5 @@ with rec {
 configured // {
   # As well as the overridden packages, we also provide a pristine version of
   # our default nixpkgs set
-  nixpkgs = getAttr (if stable then defaultVersion else "unstable")
-                    configured.nix-config;
+  nixpkgs = getAttr defaultVersion configured.nix-config;
 }
