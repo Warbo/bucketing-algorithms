@@ -1,10 +1,18 @@
 # Commands which split their input into various "buckets", e.g. based on
 # clustering. We don't do any exploration or reduction, we just look at the
 # resulting buckets.
-{ bash, bucketCheck, haskellPackages, hsOverride, mkBin, nixpkgs1709,
-  runCommand, withDeps, wrap, writeScript }:
+{ bash, bucketCheck, haskellPackages, haskellPkgDepsSet, hsOverride, mkBin,
+  nixpkgs1709, runCommand, withDeps, wrap, writeScript }:
 
 with rec {
+  hsPkgs = haskellPackages.override {
+    overrides = self: super: haskellPkgDepsSet {
+      name          = "ML4HSFE";
+      dir           = ML4HSFE;
+      extra-sources = [];
+      hsPkgs        = self;
+    };
+  };
   haskellVersion = runCommand "recurrent-bucket"
     {
       buildInputs = [

@@ -65,6 +65,7 @@ fix (self: rec {
   haskellPackages       = callPackage ./haskellPackages.nix       {};
   haskellPkgToAsts      = callPackage ./haskellPkgToAsts.nix      {};
   haskellPkgToRawAsts   = callPackage ./haskellPkgToRawAsts.nix   {};
+  haskellSources        = callPackage ./haskellSources.nix        {};
   haskellTE             = callPackage ./haskellTE.nix             {};
   hsOverride            = callPackage ./hsOverride.nix            {};
   makeSamples           = callPackage ./makeSamples.nix           {};

@@ -8,8 +8,8 @@ with rec {
     nix-config-src = fetchFromGitHub {
       owner  = "Warbo";
       repo   = "nix-config";
-      rev    = "99bc878";
-      sha256 = "0q8f30vzvngnnvszxxp6vhr649y4lvix4r9axhvmpc9wr5afls6s";
+      rev    = "0133fb0";
+      sha256 = "1c494608ldi285jv1axdkq8fy9kfzz0bh2w2kk1z65wdfnh1ywp6";
     };
   };
 
