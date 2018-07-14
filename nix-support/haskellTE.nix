@@ -1,5 +1,5 @@
 # Useful for ASTs, etc.
-{ latestGit, stable }:
+{ latestGit }:
 
 with {
   src = latestGit {
@@ -11,4 +11,4 @@ with {
   };
 };
 
-import "${src}/nix-support" { inherit stable; }
+import "${src}/nix-support" {}

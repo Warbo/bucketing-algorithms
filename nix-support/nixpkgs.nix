@@ -1,5 +1,3 @@
-{ stable ? true }:
-
 # Provides an augmented package set to use instead of <nixpkgs>
 with builtins;
 with rec {
@@ -8,7 +6,7 @@ with rec {
 
   # nix-config defines a bunch of package sets we can use
   configured = (import <nixpkgs> { config = {}; }).callPackage ./nix-config.nix
-                 { inherit defaultVersion stable; };
+                 { inherit defaultVersion; };
 };
 
 configured // {
