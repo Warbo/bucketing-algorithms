@@ -1,27 +1,52 @@
-# All of our "global" definitions live here (i.e. everything that's used in more
-# than one place). Note that care should be taken to avoid infinite loops, since
-# 'callPackage' gets arguments from 'self', which is the set we're defining!
-{
-  lib    ? (import <nixpkgs> { config = {}; }).lib,
-  stable ? true,
-  ...
-}@args:
+# Defines a nixpkgs overlay: this is intended to be used like:
+#
+#   import <nixpkgs> { overlays = [ (import ./overlay.nix) ]; }
+#
+# Note that you might prefer ./default.nix or ./release.nix to do this for you.
+#
+# An overlay defines a bunch of attributes which get added to those of nixpkgs.
+# Its arguments are 'super' (the original nixpkgs set) and 'self' (the nixpkgs
+# set augmented with these new definitions). Note that 'self' requires laziness
+# to avoid an infinite loop! In general, our definitions should take their
+# dependencies from 'self', since this will propagate overrides, etc. The two
+# main exceptions, used to avoid infinite loops, are:
+#
+#  - If we're overriding something, e.g. replacing 'foo' with 'foo.override...',
+#    but keeping the same name (e.g. 'foo'), we should take the original from
+#    'super', i.e. 'super.foo.override...'. This is because 'self.foo' refers to
+#    our override, which is not the thing we want to override!
+#  - The names defined by our overlay cannot depend on 'self', since this would
+#    introduce a circular dependency. For example, if we did:
+#      self: super: self.lib.mapAttrs myFunc myAttrs
+#    This is an infinite loop, since the result of this call might include a
+#    'lib' attribute, in which case that's the 'lib.mapAttrs' we'd be calling.
+#    Note that this is not just Nix being naive: we might think "I know how
+#    'mapAttrs' (or whatever) works, and it won't produce a 'lib' override, but
+#    Nix isn't able to spot that". In fact, we *don't* know how 'mapAttrs' works
+#    since this is a constraint not a definition. Valid solutions include e.g.
+#      with rec { mapAttrs = _: _: { lib = { inherit mapAttrs; }; }; }; mapAttrs
+#    This ignores its input and overrides 'lib', yet it fits the circular logic
+#    above! This is why we must break such loops by using 'super' instead.
+#
+# Note that referring to 'self' in our *values* is fine, as long as we avoid
+# self-reference (pun intended), since values cannot affect their names, so they
+# cannot introduce ambiguity or "global circularity" (self-reference can cause
+# "local circularity", but that only breaks that definition and its dependents).
+self: super:
+
+# Our policy is to define things in separate files in nix-support/, taking
+# their arguments from 'self // { inherit super; }'. We only include "global"
+# definitions, i.e. things we want to expose to users and things which are
+# useful across multiple definitions. It's fine for a nix-support/ file to only
+# be imported by those things which use it, as this keeps scopes narrow.
 
 with builtins;
-with lib;
+with super.lib;
 
-fix (self: rec {
-  # Whether to use the latest packages or known-good versions
-  inherit stable;
-
+{
   # The main nixpkgs repo, augmented with nix-config, depending on un/stable
-  inherit (import ./nixpkgs.nix { inherit stable; })
+  inherit (import ./nixpkgs.nix {})
     nix-config nix-config-src nixpkgs;
-
-  inherit (nixpkgs)
-    # Regular dependencies, used as-is
-    bash buildEnv cabal-install glibcLocales jq lib runCommand stdenv utillinux
-    writeScript;
 
   inherit (nix-config)
     # Pristine releases of nixpkgs. Useful for avoiding known incompatibilities.
