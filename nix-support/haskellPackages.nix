@@ -12,6 +12,9 @@ assert given == required || die {
   error = "Wrong GHC version for bucketing-algorithms";
 };
 {
-  value = hsPkgs.override { overrides = hsOverride (_: _: {}); };
-  removeOverrides = true;  # Otherwise they'd mess up the Haskell overrides
+  def = hsPkgs.override (old: {
+    overrides = nixpkgs1803.lib.composeExtensions
+                  (old.overrides or (_: _: {}))
+                  hsOverride;
+  });
 }

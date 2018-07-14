@@ -57,7 +57,4 @@ assert all (s: with { x = getAttr s result; };
                        err "Size ${s} rep ${r} wrong size")
                    (attrNames x))
            (attrNames result) || err "Wrong size sample";
-{
-  removeOverrides = true;
-  value           = result;
-}
+{ def = result; }

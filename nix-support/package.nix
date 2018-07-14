@@ -1,8 +1,7 @@
 { buildEnv, hashBucket }:
 
 {
-  removeOverrides = true;
-  value           = buildEnv {
+  def = buildEnv {
     name  = "haskell-theory-exploration";
     paths = [ hashBucket ];
   };

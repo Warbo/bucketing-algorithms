@@ -42,25 +42,30 @@ self: super:
 
 with builtins;
 with super.lib;
-with {
+with rec {
   # Imports a file and calls it as a function with args from 'self' (allowing
   # both 'self' and 'super' to be given as args if desired). The result is
   # overridable by default; to avoid this we can return a set with a 'def'
   # attribute; this also allows 'tests' to be returned alongside.
-  call = f:
-    with {
-      result = self.newScope { inherit self super; }
-                             (./nix-support + "/${f}.nix")
-                             {};
+  call = f: self.newScope { inherit self super; }
+                          (./nix-support + "/${f}.nix")
+                          {};
+
+  appendDef = n: old:
+    with rec {
+      wrap   = x: { "${n}" = x; };
+      result = call n;
+      def    = wrap (result.def or result);
+      test   = if result ? def && result ? tests then wrap result.tests else {};
+      tests  = {
+        bucketing-algorithms-tests = old.bucketing-algorithms-tests // test;
+      };
     };
-    if result.removeOverrides or false
-       then result.value
-       else result;
+    old // def // tests // {
+      bucketing-algorithms = old.bucketing-algorithms // def // tests;
+    };
 };
-fold (n: old: old // {
-       "${n}"               = call n;
-       bucketing-algorithms = old.bucketing-algorithms // { "${n}" = call n; };
-     }) { bucketing-algorithms = {}; } [
+fold appendDef { bucketing-algorithms = {}; bucketing-algorithms-tests = {}; } [
   "averageProportions"
   "benchmark"
   "benchmarkingCommands"
