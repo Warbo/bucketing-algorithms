@@ -61,7 +61,7 @@ with super.lib;
   # Fixed versions to avoid known breakages
 
   inherit (nixpkgs1603)
-    # Args differ in new versions, which breaks ./haskellPackages.nix scripts
+    # Args differ in new versions, which breaks ./nix-support/haskellPackages.nix scripts
     cabal2nix;
 
   inherit (nixpkgs1609)
@@ -78,25 +78,27 @@ with super.lib;
 
   # Imports a file and calls the function it contains, automatically looking up
   # argument values from the 'self' attrset.
-  callPackage = nixpkgs.callPackage ./callPackage.nix { inherit self; };
+  callPackage = nixpkgs.callPackage ./nix-support/callPackage.nix { inherit self; };
 
-  averageProportions    = callPackage ./averageProportions.nix    {};
-  benchmarkingCommands  = callPackage ./benchmarkingCommands.nix  {};
-  bucketCheck           = callPackage ./bucketCheck.nix           {};
-  bucketProportions     = callPackage ./bucketProportions.nix     {};
-  calculateProportions  = callPackage ./calculateProportions.nix  {};
-  callHackage           = callPackage ./callHackage.nix           {};
-  hashBucket            = callPackage ./hashBucket.nix            {};
-  haskellPackages       = callPackage ./haskellPackages.nix       {};
-  haskellPkgToAsts      = callPackage ./haskellPkgToAsts.nix      {};
-  haskellPkgToRawAsts   = callPackage ./haskellPkgToRawAsts.nix   {};
-  haskellSources        = callPackage ./haskellSources.nix        {};
-  haskellTE             = callPackage ./haskellTE.nix             {};
-  hsOverride            = callPackage ./hsOverride.nix            {};
-  makeSamples           = callPackage ./makeSamples.nix           {};
-  ML4HSFE               = callPackage ./ML4HSFE.nix               {};
-  nixedHsPkg            = callPackage ./nixedHsPkg.nix            {};
-  package               = callPackage ./package.nix               {};
-  recurrentBucket       = callPackage ./recurrentBucket.nix       {};
-  tebenchmark           = callPackage ./tebenchmark.nix           {};
-})
+  averageProportions    = callPackage ./nix-support/averageProportions.nix   {};
+  benchmark             = callPackage ./nix-support/benchmark.nix            {};
+  benchmarkingCommands  = callPackage ./nix-support/benchmarkingCommands.nix {};
+  bucketCheck           = callPackage ./nix-support/bucketCheck.nix          {};
+  bucketProportions     = callPackage ./nix-support/bucketProportions.nix    {};
+  calculateProportions  = callPackage ./nix-support/calculateProportions.nix {};
+  callHackage           = callPackage ./nix-support/callHackage.nix          {};
+  hashBucket            = callPackage ./nix-support/hashBucket.nix           {};
+  haskellPackages       = callPackage ./nix-support/haskellPackages.nix      {};
+  haskellPkgToAsts      = callPackage ./nix-support/haskellPkgToAsts.nix     {};
+  haskellPkgToRawAsts   = callPackage ./nix-support/haskellPkgToRawAsts.nix  {};
+  haskellSources        = callPackage ./nix-support/haskellSources.nix       {};
+  haskellTE             = callPackage ./nix-support/haskellTE.nix            {};
+  hsOverride            = callPackage ./nix-support/hsOverride.nix           {};
+  makeSamples           = callPackage ./nix-support/makeSamples.nix          {};
+  ML4HSFE               = callPackage ./nix-support/ML4HSFE.nix              {};
+  nixedHsPkg            = callPackage ./nix-support/nixedHsPkg.nix           {};
+  package               = callPackage ./nix-support/package.nix              {};
+  performance           = callPackage ./nix-support/performance.nix          {};
+  recurrentBucket       = callPackage ./nix-support/recurrentBucket.nix      {};
+  tebenchmark           = callPackage ./nix-support/tebenchmark.nix          {};
+}

@@ -1,16 +1,15 @@
-# Set 'bypassPublicApi' to get access to all of our implementation details, but
-# keep in mind that we make no guarantees about their stability.
-{ args ? {}, bypassPublicApi ? false }:
+# Applies our overlay to a known-good version of nixpkgs
 
-with {
-  defs = rec {
-    # Implementation details
-    pkgs = import ./nix-support args;
+# We use the system's <nixpkgs> to bootstrap, so we can access nix-helpers
+with import <nixpkgs> { overlays = [ (import ./overlay.nix) ]; };
 
-    # Provides our exploration scripts
-    inherit (pkgs) package;
+# We expose a version pinned to a nixpkgs version provided by nix-helpers. Note
+# that since this version predates nixpkgs1703, it doesn't provide the overlays
+# API, so we emulate it using the old packageOverrides API. If this version gets
+# bumped in the future, it can be simplified to just use the overlay directly.
+import nix-helpers.repo1603 {
+  config = {
+    packageOverrides = super:
+      super.lib.fix (self: import ./overlay.nix self super);
   };
-};
-if bypassPublicApi
-   then defs
-   else defs.package
+}

@@ -1,13 +1,7 @@
 # A useful entry point for continuous integration (e.g. Hydra)
-with import ./. {
-  args            = {};
-  bypassPublicApi = true;
-};
+# Imports those useful derivations from default.nix, like user-facing packages,
+# tests, benchmarks, etc.
 {
-  inherit package;
-  benchmark   = import ./shell.nix;
-  performance = pkgs.bucketProportions {
-    maxSize = 10;
-    reps    = 10;
-  };
+  inherit (import ./.)
+    benchmark package performance;
 }
