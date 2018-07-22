@@ -1,0 +1,8 @@
+From: Chris Warburton
+Date: Tue, 17 Jul 2018 10:36:20 +0100
+Subject: Re: Don't reduce in quickspecAsts or concurrentQuickspec
+Message-Id: <cacc597411d5955c-d12a96878a4136af-artemis@nixos>
+References: <cacc597411d5955c-0-artemis@nixos>
+In-Reply-To: <cacc597411d5955c-0-artemis@nixos>
+
+These commands don't exist in this fork

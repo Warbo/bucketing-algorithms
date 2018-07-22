@@ -1,8 +1,9 @@
 From: Chris Warburton
 Date: Wed, 08 Nov 2017 12:23:19 +0000
-State: new
+State: resolved
 Subject: ifcxt-0.1.1 doesn't build with GHC 8.*
 Message-Id: <dce06df48c444e89-0-artemis@nixos>
+resolution: fixed
 
 On "unstable":
 

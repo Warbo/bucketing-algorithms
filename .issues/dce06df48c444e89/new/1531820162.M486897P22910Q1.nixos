@@ -1,0 +1,9 @@
+From: Chris Warburton
+Date: Tue, 17 Jul 2018 10:35:17 +0100
+Subject: Re: ifcxt-0.1.1 doesn't build with GHC 8.*
+Message-Id: <dce06df48c444e89-a857da8e88a8d71c-artemis@nixos>
+References: <dce06df48c444e89-0-artemis@nixos>
+In-Reply-To: <dce06df48c444e89-0-artemis@nixos>
+
+Doesn't really matter. Even if it does, fix in MLSpec or something
+rather than here.

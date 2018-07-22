@@ -1,0 +1,10 @@
+From: Chris Warburton
+Subject: Re: Reduce recurrent clustering overhead
+Date: Tue, 17 Jul 2018 10:11:39 +0100
+Message-Id: <ea72f25bef38255d-edc2a2ef80b2c4b5-artemis@nixos>
+References: <ea72f25bef38255d-0-artemis@nixos>
+In-Reply-To: <ea72f25bef38255d-0-artemis@nixos>
+
+Nailgun turns out to be no help.
+
+Rewritten to use a Haskell kmeans library and it's much faster now.

@@ -1,8 +1,9 @@
 From: Chris Warburton
 Date: Fri, 15 Jun 2018 14:35:11 +0100
-State: new
+State: resolved
 Subject: Reduce recurrent clustering overhead
 Message-Id: <ea72f25bef38255d-0-artemis@nixos>
+resolution: fixed
 
 Recurrent clustering is *slow*. I had the time_recurrent benchmark do
 the bucketing within an strace wrapper (strace- ttt -f bucketing-script)

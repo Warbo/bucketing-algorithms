@@ -1,8 +1,9 @@
 From: Chris Warburton
 Date: Wed, 08 Nov 2017 12:18:43 +0000
-State: new
+State: resolved
 Subject: Don't reduce in quickspecAsts or concurrentQuickspec
 Message-Id: <cacc597411d5955c-0-artemis@nixos>
+resolution: fixed
 
 We have a standalone reduce-equations command, so we shouldn't have the
 other commands do reduction.
