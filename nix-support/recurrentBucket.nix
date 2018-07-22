@@ -5,14 +5,6 @@
   nixpkgs1709, runCommand, withDeps, wrap, writeScript }:
 
 with rec {
-  hsPkgs = haskellPackages.override {
-    overrides = self: super: haskellPkgDepsSet {
-      name          = "ML4HSFE";
-      dir           = ML4HSFE;
-      extra-sources = [];
-      hsPkgs        = self;
-    };
-  };
   haskellVersion = runCommand "recurrent-bucket"
     {
       buildInputs = [
