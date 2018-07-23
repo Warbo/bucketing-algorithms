@@ -19,8 +19,8 @@ with {
 lib.mapAttrs (_: get) {
   # Only needed for dependency solving
 
-  semigroups = "cabal://semigroups-0.11";
-  tasty      = "cabal://tasty-0.11.2.1";
+  semigroups = { spec = "cabal://semigroups-0.11"; };
+  tasty      = { spec = "cabal://tasty-0.11.2.1";  };
 
   # Specific versions of other people's packages, e.g. with patches we need
 
