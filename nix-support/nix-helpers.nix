@@ -15,7 +15,9 @@ with rec {
 
   newImport = import path { overlays = [ (import "${src}/overlay.nix") ]; };
 
-  defs = if builtins.compareVersions lib.nixpkgsVersion "17.03" == -1
+  version = (import path {}).lib.nixpkgsVersion;
+
+  defs = if builtins.compareVersions version "17.03" == -1
             then oldImport
             else newImport;
 };
