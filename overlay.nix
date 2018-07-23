@@ -43,6 +43,46 @@ self: super:
 with builtins;
 with super.lib;
 with rec {
+  # Definitions taken from outside this project
+  initial = {
+    inherit (self.nix-helpers)
+      # Pristine releases of nixpkgs. Useful for avoiding known problems
+      nixpkgs1603 nixpkgs1609 nixpkgs1709 nixpkgs1803
+
+      # Helper functions, etc.
+      allDrvsIn asv attrsToDirs backtrace composeWithArgs die fail inNixedDir
+      latestGit mkBin nixListToBashArray nothing pipeToNix repo reverse
+      sanitiseName stableHackageDb stripOverrides timeout tryElse
+      unlines unpack withDeps wrap;
+
+    # Fixed versions to avoid known breakages
+
+    inherit (self.nixpkgs1803)
+      # Needed for Nix 2.x daemon tunnel hack
+      cabal2nix nix;
+
+    inherit (self.nix-helpers.override { path = self.nix-helpers.repo1803; })
+      # This is defined by nix-helpers, but it must take its dependencies from
+      # nixpkgs 18.03 or later, in order to use Nix 2.x
+      runCabal2nix2 withNix;
+
+    inherit (self.nixpkgs1609)
+      # The quoting is different in other versions, which breaks e.g. wrap
+      makeWrapper
+
+      # Old versions don't have needed contracts, new ones don't build on i686
+      racket;
+
+    # Cases where we want both the attribute set and its attributes available
+
+    inherit (self.haskellTE)
+      testData;
+
+    # TODO: Turn these into normal appendDef definitions
+    asv-nix = self.callPackage ./benchmarks/asv-nix.nix {};
+    fixHtml = self.callPackage ./benchmarks/fixHtml.nix {};
+  };
+
   # Imports a file and calls it as a function with args from 'self' (allowing
   # both 'self' and 'super' to be given as args if desired). The result is
   # overridable by default; to avoid this we can return a set with a 'def'
@@ -51,6 +91,12 @@ with rec {
                           (./nix-support + "/${f}.nix")
                           {};
 
+  # Accumulate a definition on to our package set. We put all definitions into
+  # bucketing-algorithms so we can refer to them elsewhere, and pull out any
+  # given tests into a separate set to prevent them blocking evaluation. Note
+  # that fast or critical tests should be incorporated into the main derivations
+  # so that they're guaranteed to run. The separate test set is for long-running
+  # and bulky checks which we may not want slowing down our main builders.
   appendDef = n: old:
     with rec {
       wrap   = x: { "${n}" = x; };
@@ -65,54 +111,30 @@ with rec {
       bucketing-algorithms = old.bucketing-algorithms // def // tests;
     };
 };
-fold appendDef { bucketing-algorithms = {}; bucketing-algorithms-tests = {}; } [
-  "averageProportions"
-  "benchmark"
-  "benchmarkingCommands"
-  "bucketCheck"
-  "bucketProportions"
-  "calculateProportions"
-  "callHackage"
-  "hashBucket"
-  "haskellPackages"
-  "haskellPkgToAsts"
-  "haskellPkgToRawAsts"
-  "haskellSources"
-  "haskellTE"
-  "hsOverride"
-  "makeSamples"
-  "ML4HSFE"
-  "nix-helpers"
-  "package"
-  "performance"
-  "recurrentBucket"
-  "tebenchmark"
-] // {
-  inherit (self.nix-helpers)
-    # Pristine releases of nixpkgs. Useful for avoiding known incompatibilities.
-    nixpkgs1603 nixpkgs1609 nixpkgs1709 nixpkgs1803
-
-    # Helper functions, etc.
-    allDrvsIn asv attrsToDirs backtrace composeWithArgs die fail inNixedDir
-    latestGit mkBin nixListToBashArray nothing pipeToNix repo reverse
-    runCabal2nix sanitiseName stableHackageDb stripOverrides timeout tryElse
-    unlines unpack withDeps wrap;
-
-  # Fixed versions to avoid known breakages
-
-  inherit (self.nixpkgs1603)
-    # Args differ in new versions, which breaks ./nix-support/haskellPackages.nix scripts
-    cabal2nix;
-
-  inherit (self.nixpkgs1609)
-    # The quoting is different in other versions, which breaks e.g. wrap
-    makeWrapper
-
-    # Old versions don't have the needed contracts, new ones don't build on i686
-    racket;
-
-  # Cases where we want both the attribute set and its attributes available
-
-  inherit (self.haskellTE)
-    testData;
-}
+fold appendDef
+  (initial // {
+    bucketing-algorithms       = initial;
+    bucketing-algorithms-tests = {};
+  })
+  [
+    "averageProportions"
+    "benchmark"
+    "benchmarkingCommands"
+    "bucketCheck"
+    "bucketProportions"
+    "calculateProportions"
+    "callHackage"
+    "hashBucket"
+    "haskellPackages"
+    "haskellSources"
+    "haskellTE"
+    "hsOverride"
+    "makeSamples"
+    "ML4HSFE"
+    "nix-helpers"
+    "package"
+    "performance"
+    "recurrentBucket"
+    "tebenchmark"
+    "warbo-packages"
+  ]
