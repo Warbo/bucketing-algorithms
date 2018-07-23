@@ -8,10 +8,10 @@
 
 with builtins;
 with trace (toJSON { inherit dir root; }) {
-  fixed    = import "${dir }/nix-support" {};
-  measured = import "${root}/nix-support" {};
+  fixed    = import "${dir }";
+  measured = import "${root}";
 };
-with fixed.lib;
+with fixed.nixpkgs1609.lib;
 
 fixed.mkBin {
   name  = "python";
