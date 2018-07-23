@@ -5,8 +5,8 @@ with rec {
   src = fetchFromGitHub {
     owner  = "Warbo";
     repo   = "nix-helpers";
-    rev    = "96a2fa3";
-    sha256 = "0j5xxgjbyjsj9ayj3q7b95s7gzmmahwlj27nvbmdjyrxk3dn7gxz";
+    rev    = "197a47f";
+    sha256 = "1xy271k4zbb5gpkfdql2yz9ffzcd6l0bqsx08f0p2jaz8zkqm05g";
   };
 
   oldImport = lib.fix (self: import path {
