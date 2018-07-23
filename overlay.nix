@@ -88,10 +88,6 @@ fold appendDef { bucketing-algorithms = {}; bucketing-algorithms-tests = {}; } [
   "recurrentBucket"
   "tebenchmark"
 ] // {
-  # The main nixpkgs repo, augmented with nix-config, depending on un/stable
-  inherit (import ./nixpkgs.nix {})
-    nix-config nix-config-src nixpkgs;
-
   inherit (self.nix-helpers)
     # Pristine releases of nixpkgs. Useful for avoiding known incompatibilities.
     nixpkgs1603 nixpkgs1609 nixpkgs1709 nixpkgs1803
