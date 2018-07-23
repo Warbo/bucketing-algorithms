@@ -55,6 +55,9 @@ with rec {
       sanitiseName stableHackageDb stripOverrides timeout tryElse
       unlines unpack withDeps wrap;
 
+    inherit (self.warbo-packages)
+      asv;
+
     # Fixed versions to avoid known breakages
 
     inherit (self.nixpkgs1803)

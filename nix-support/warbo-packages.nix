@@ -5,10 +5,10 @@ with {
     inherit lib path;
     src = fetchFromGitHub {
       owner  = "Warbo";
-      repo   = "nix-helpers";
-      rev    = "197a47f";
-      sha256 = "1xy271k4zbb5gpkfdql2yz9ffzcd6l0bqsx08f0p2jaz8zkqm05g";
+      repo   = "warbo-packages";
+      rev    = "21c07e0";
+      sha256 = "19y7h658s013ikqmj4dsnfyx9962q3ybbvzi2bczzcg3zhplqmd3";
     };
   };
 };
-defs.nix-helpers
+defs.warbo-packages
