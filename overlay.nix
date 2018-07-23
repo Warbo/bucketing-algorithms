@@ -50,7 +50,7 @@ with rec {
       nixpkgs1603 nixpkgs1609 nixpkgs1709 nixpkgs1803
 
       # Helper functions, etc.
-      allDrvsIn asv attrsToDirs backtrace composeWithArgs die fail inNixedDir
+      allDrvsIn attrsToDirs backtrace composeWithArgs die fail inNixedDir
       latestGit mkBin nixListToBashArray nothing pipeToNix repo reverse
       sanitiseName stableHackageDb stripOverrides timeout tryElse
       unlines unpack withDeps wrap;
@@ -67,7 +67,7 @@ with rec {
     inherit (self.nix-helpers.override { path = self.nix-helpers.repo1803; })
       # This is defined by nix-helpers, but it must take its dependencies from
       # nixpkgs 18.03 or later, in order to use Nix 2.x
-      runCabal2nix2 withNix;
+      haskellPkgDepsSet runCabal2nix2 withNix;
 
     inherit (self.nixpkgs1609)
       # The quoting is different in other versions, which breaks e.g. wrap
