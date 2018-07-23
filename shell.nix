@@ -1,13 +1,13 @@
 # Runs the benchmarks with some default options. Can also be used with nix-shell
 # to enter a shell suitable for custom benchmark invocations.
 with builtins;
-with import ./nix-support {};
+with import ./.;
 with {
   asv-nix = callPackage ./benchmarks/asv-nix.nix {};
   fixHtml = callPackage ./benchmarks/fixHtml.nix {};
 };
 runCommand "haskell-te-benchmark"
-  (nix-config.withNix {
+  (withNix {
     buildInputs  = [ asv-nix fixHtml nixpkgs1609.git nixpkgs1609.rsync ];
 
     existing     = import ./benchmarks/env.nix {
