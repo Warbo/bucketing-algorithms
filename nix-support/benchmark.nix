@@ -2,7 +2,7 @@
 # shell.nix environment.
 { asv-nix, fixHtml, nixpkgs1609, runCommand, withNix }:
 
-runCommand "haskell-te-benchmark"
+runCommand "bucketing-algorithm-benchmark"
   (withNix {
     buildInputs  = [ asv-nix fixHtml nixpkgs1609.git nixpkgs1609.rsync ];
 
