@@ -1,22 +1,40 @@
-{ die, latestGit, lib, runCabal2nix }:
+{ die, latestGit, lib, runCabal2nix2 }:
 
 with builtins;
 with {
-  get = { spec ? null, url ? null, owner ? "Warbo", repo ? null, rev, sha256}:
-    assert spec != null || url != null || repo != null || die {
-      inherit url owner repo rev sha256 spec;
-      error = "Need URL or repo or spec";
-    };
-    with rec {
-      stable  = { inherit rev sha256; };
-      fullUrl = if url == null
-                   then "https://github.com/${owner}/${repo}.git"
-                   else url;
-      src     = latestGit { inherit stable; url = fullUrl; };
-    };
-    runCabal2nix { url = if spec == null then src else spec; };
+  get = name:
+    {
+      spec   ? null,
+      url    ? null,
+      owner  ? "Warbo",
+      repo   ? null,
+      rev    ? null,
+      sha256 ? null
+    }:
+      assert spec != null || url != null || repo != null || die {
+        inherit name owner repo rev sha256 spec url;
+        error = "Need URL or repo or spec";
+      };
+      assert !(elem null [ url repo ]) -> !(elem null [ rev sha256 ]) || die {
+        inherit name owner repo rev sha256 spec url;
+        error = "Using (GitHub) repo or (Git) url requires rev and sha256";
+      };
+      with rec {
+        stable  = {
+          inherit rev sha256;
+          unsafeSkip = false;
+        };
+        fullUrl = if url == null
+                     then "https://github.com/${owner}/${repo}.git"
+                     else url;
+        src     = latestGit { inherit stable; url = fullUrl; };
+      };
+      runCabal2nix2 {
+        inherit name;
+        url = if spec == null then src else spec;
+      };
 };
-lib.mapAttrs (_: get) {
+lib.mapAttrs get {
   # Only needed for dependency solving
 
   semigroups = { spec = "cabal://semigroups-0.11"; };
