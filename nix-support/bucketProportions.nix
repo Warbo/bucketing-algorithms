@@ -3,7 +3,7 @@
 #
 # Write output to JSON for archiving.
 { averageProportions, benchmarkingCommands, calculateProportions, jq, lib,
-  makeSamples, nixpkgs, runCommand, tebenchmark, testData, wrap }:
+  makeSamples, nixpkgs, python3, runCommand, tebenchmark, testData, wrap }:
 with { inherit (builtins) concatStringsSep map; };
 
 given: with rec {
@@ -20,7 +20,7 @@ given: with rec {
       inherit samples;
       script = wrap {
         name  = "process-samples.py";
-        paths = [ nixpkgs.python3 ];
+        paths = [ python3 ];
         vars  = { inherit key prog; };
         script = ''
           #!/usr/bin/env python3
