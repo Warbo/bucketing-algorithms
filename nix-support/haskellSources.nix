@@ -33,7 +33,8 @@ with rec {
       };
       runCabal2nix {
         inherit name;
-        url = if spec == null then src else spec;
+        args = [ "--compiler=ghc-7.10.3" "--no-haddock" ];
+        url  = if spec == null then src else spec;
       };
 };
 lib.mapAttrs get {
