@@ -1,4 +1,4 @@
-{ die, latestGit, lib, runCabal2nix2 }:
+{ die, latestGit, lib, runCabal2nix }:
 
 with builtins;
 with {
@@ -29,7 +29,7 @@ with {
                      else url;
         src     = latestGit { inherit stable; url = fullUrl; };
       };
-      runCabal2nix2 {
+      runCabal2nix {
         inherit name;
         url = if spec == null then src else spec;
       };

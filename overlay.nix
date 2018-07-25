@@ -67,7 +67,7 @@ with rec {
     inherit (self.nix-helpers.override { path = self.nix-helpers.repo1803; })
       # This is defined by nix-helpers, but it must take its dependencies from
       # nixpkgs 18.03 or later, in order to use Nix 2.x
-      haskellPkgDepsSet runCabal2nix2 withNix;
+      haskellPkgDepsSet runCabal2nix withNix;
 
     inherit (self.nixpkgs1609)
       # The quoting is different in other versions, which breaks e.g. wrap
