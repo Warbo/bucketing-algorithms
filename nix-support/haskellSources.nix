@@ -1,7 +1,9 @@
-{ die, latestGit, lib, runCabal2nix }:
+{ callPackage, die, latestGit, lib }:
 
 with builtins;
-with {
+with rec {
+  runCabal2nix = callPackage ./runCabal2nix.nix {};
+
   get = name:
     {
       spec   ? null,
