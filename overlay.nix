@@ -76,8 +76,6 @@ with rec {
       # Old versions don't have needed contracts, new ones don't build on i686
       racket;
 
-    # Cases where we want both the attribute set and its attributes available
-
     inherit (self.haskellTE)
       testData;
 
