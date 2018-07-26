@@ -1,8 +1,9 @@
-{ die, hsOverride, lib, nixpkgs1803 }:
+{ die, haskellSources, lib, nixpkgs1603, nixpkgs1803 }:
 
 with builtins;
+with lib;
 with rec {
-  hsPkgs   = nixpkgs1803.haskell.packages.ghc7103;
+  hsPkgs   = nixpkgs1603.haskell.packages.ghc7103;
   given    = hsPkgs.ghc.version;
   required = "7.10.3";
 };
@@ -15,6 +16,7 @@ assert given == required || die {
   def = hsPkgs.override (old: {
     overrides = nixpkgs1803.lib.composeExtensions
                   (old.overrides or (_: _: {}))
-                  hsOverride;
+                  (helf: huper: mapAttrs (_: p: helf.callPackage p {})
+                                         haskellSources);
   });
 }

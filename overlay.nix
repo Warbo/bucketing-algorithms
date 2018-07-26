@@ -129,7 +129,6 @@ fold appendDef
     "haskellPackages"
     "haskellSources"
     "haskellTE"
-    "hsOverride"
     "makeSamples"
     "ML4HSFE"
     "nix-helpers"
