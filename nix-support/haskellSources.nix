@@ -2,8 +2,6 @@
 
 with builtins;
 with rec {
-  runCabal2nix = callPackage ./runCabal2nix.nix {};
-
   get = name:
     {
       spec   ? null,
