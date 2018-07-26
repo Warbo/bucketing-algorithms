@@ -127,8 +127,6 @@ fold appendDef
     "callHackage"
     "ghcWithML4HSFE"
     "hashBucket"
-    "haskellPackages"
-    "haskellSources"
     "haskellTE"
     "makeSamples"
     "nix-helpers"
