@@ -1,4 +1,4 @@
-{ latestGit, haskellPackages }:
+{ latestGit }:
 
 import (latestGit {
   url    = http://chriswarbo.net/git/theory-exploration-benchmarks.git;

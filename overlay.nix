@@ -50,7 +50,7 @@ with rec {
       nixpkgs1603 nixpkgs1609 nixpkgs1709 nixpkgs1803
 
       # Helper functions, etc.
-      allDrvsIn attrsToDirs backtrace composeWithArgs die fail inNixedDir
+      allDrvsIn backtrace composeWithArgs die fail inNixedDir
       latestGit mkBin nixListToBashArray nothing pipeToNix repo reverse
       sanitiseName stableHackageDb stripOverrides timeout tryElse
       unlines unpack withDeps wrap;
@@ -125,12 +125,12 @@ fold appendDef
     "bucketProportions"
     "calculateProportions"
     "callHackage"
+    "ghcWithML4HSFE"
     "hashBucket"
     "haskellPackages"
     "haskellSources"
     "haskellTE"
     "makeSamples"
-    "ML4HSFE"
     "nix-helpers"
     "package"
     "performance"

@@ -7,8 +7,8 @@
 #  - The impact of the bucketing algorithms is measured, on lots of test data
 #  - The speed of the scripts is measured on small inputs, to aid us in
 #    optimising their implementation (since the above can be very slow!)
-{ bash, callPackage, fail, hashBucket, haskellPackages, jq, lib, makeSamples,
-  python3, recurrentBucket, runCommand, tebenchmark, testData, withDeps, wrap,
+{ bash, callPackage, fail, hashBucket, jq, lib, makeSamples, python3,
+  recurrentBucket, runCommand, tebenchmark, testData, withDeps, wrap,
   writeScript }:
 
 with builtins;
