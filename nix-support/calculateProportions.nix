@@ -72,35 +72,86 @@ with rec {
       ## Data processors, one for each 'level'
 
       def process(data):
+        assert type(data) == type({}), repr({
+          'error': 'Expected dictionary for "process"',
+          'given': data
+        })
         return {s: processSize(x) for s, x in data.items()}
 
       def processSize(data):
+        assert type(data) == type({}), repr({
+          'error': 'Expected dictionary for "processSize"',
+          'given': data
+        })
         return {r: processRep(x) for r, x in data.items()}
 
       def processRep(data):
-        return {m: x if m == "sample" else processMethod(x, data["sample"]) \
+        assert type(data) == type({}), repr({
+          'error': 'Expected dictionary for "processRep"',
+          'given': data
+        })
+        assert 'sample' in data, repr({
+          'error': 'Expected "sample" entry for "processRep"',
+          'given': data
+        })
+        return {m: x if m == 'sample' else processMethod(x, data['sample']) \
                 for m, x in data.items()}
 
       def processMethod(data, sample):
+        assert type(data) == type({}), repr({
+          'error': 'Expected dictionary for "processMethod"',
+          'given': data
+        })
         return {bs: processBuckets(x, sample) for bs, x in data.items()}
 
       def processBuckets(data, sample):
+        assert type(data) == type({}), repr({
+          'error': 'Expected dictionary for "processBuckets"',
+          'given': data
+        })
+        assert 'names' in data, repr({
+          'error': 'Expected "names" entry for "processBuckets"',
+          'given': data
+        })
+        assert type(data['names']) == type([]), repr({
+          'error': 'Expected "names" to be a list in "processBuckets"',
+          'given': data
+        })
+        assert 'names' in sample, repr({
+          'error' : 'Expected "names" entry in sample for "processBuckets"',
+          'sample': sample,
+          'data'  : data
+        })
         bucketNames = concat(data['names'])
         assert sorted(bucketNames) == sorted(sample['names']), repr({
-          'error'       : "Buckets don't contain all names",
+          'error'       : 'Buckets do not contain all names',
           'bucketNames' : bucketNames,
           'sampleNames' : sample['names']
         })
 
+        assert 'theorems' in data, repr({
+          'error': 'Expected "theorems" entry in "processBuckets"',
+          'given': data
+        })
         bucketTheorems = data['theorems']
         assert all((t in sample['theorems'] for t in bucketTheorems)), repr({
           'error'          : 'Buckets have theorems from outside ground truth',
           'bucketTheorems' : bucketTheorems,
-          'sampleTheorems' : sample['theorems']
+          'sampleTheorems' : sample['theorems'],
+          'sample'         : sample,
+          'data'           : data
         })
 
         found = len(bucketTheorems)
         avail = len(sample['theorems'])
+        assert found <= avail, repr({
+          'error'  : 'Found more theorems than were available',
+          'avail'  : avail,
+          'found'  : found,
+          'data'   : data,
+          'sample' : sample
+        })
+
         return dict(data, comparison={
           'found'      : found,
           'available'  : avail,
@@ -108,7 +159,15 @@ with rec {
           'proportion' : float(found) / float(avail)
         })
 
-      print(json.dumps(process(json.loads(sys.stdin.read()))))
+      given = sys.stdin.read()
+      try:
+        print(json.dumps(process(json.loads(given))))
+      except:
+        sys.stderr.write(repr({
+          'error': 'Failed to calculate proportions',
+          'stdin': given
+        }) + '\n')
+        raise
     '';
   };
 
