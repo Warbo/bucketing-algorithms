@@ -3,7 +3,7 @@
 #
 # Write output to JSON for archiving.
 { averageProportions, benchmarkingCommands, calculateProportions, jq, lib,
-  makeSamples, python3, runCommand, tebenchmark, testData, wrap }:
+  makeSamples, python3, runCommand, tebenchmark, wrap }:
 with { inherit (builtins) concatStringsSep map; };
 
 given: with rec {

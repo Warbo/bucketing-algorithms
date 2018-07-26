@@ -8,7 +8,7 @@
 #  - The speed of the scripts is measured on small inputs, to aid us in
 #    optimising their implementation (since the above can be very slow!)
 { bash, callPackage, fail, hashBucket, jq, lib, makeSamples, python3,
-  recurrentBucket, runCommand, tebenchmark, testData, withDeps, wrap,
+  recurrentBucket, runCommand, tebenchmark, withDeps, wrap,
   writeScript }:
 
 with builtins;
