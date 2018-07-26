@@ -16,6 +16,7 @@ with rec {
         import qualified Data.ByteString.Char8      as BS
         import qualified Data.ByteString.Lazy.Char8 as LBS
         import qualified Data.Char                  as C
+        import qualified Data.Functor.Identity      as I
         import qualified Data.HashMap.Strict        as H
         import           Data.Maybe                 (fromJust)
         import qualified Data.Vector                as V
