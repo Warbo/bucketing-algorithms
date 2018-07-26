@@ -1,22 +1,13 @@
 # Commands which split their input into various "buckets", e.g. based on
 # clustering. We don't do any exploration or reduction, we just look at the
 # resulting buckets.
-{ bash, bucketCheck, haskellPackages, haskellPkgDepsSet, hsOverride, mkBin,
+{ bash, bucketCheck, haskellPackages, haskellPkgDepsSet, mkBin, ML4HSFE,
   nixpkgs1709, runCommand, withDeps, wrap, writeScript }:
 
 with rec {
   haskellVersion = runCommand "recurrent-bucket"
     {
-      buildInputs = [
-        (haskellPackages.ghcWithPackages (hs: [
-          hs.aeson
-          hs.ML4HSFE
-          hs.process
-          hs.process-extras
-          hs.unordered-containers
-          hs.vector
-        ]))
-      ];
+      buildInputs = [ ML4HSFE ];
       main = writeScript "recurrent-bucket-main.hs" ''
         {-# LANGUAGE OverloadedStrings #-}
         module Main where
