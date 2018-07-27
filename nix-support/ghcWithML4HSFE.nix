@@ -4,26 +4,14 @@
 
 with builtins;
 with rec {
-  getRepo = { name, repo, rev, self, sha256 }: run {
-    inherit name self;
-    url = fetchFromGitHub {
-      inherit repo rev sha256;
-      owner = "Warbo";
-    };
-  };
-
-  getHackage = { name, self, sha256, version }:
-    with { nv = "${name}-${version}"; };
-    run {
-      inherit name self;
-      url = unpack (fetchurl {
-        inherit sha256;
-        url = "https://hackage.haskell.org/package/${nv}/${nv}.tar.gz";
-      });
-    };
-
-  run = { name, self, url }:
-    self.callPackage (runCabal2nix { inherit name url; }) {};
+  getRepo = { name, repo, rev, self, sha256 }:
+    self.callPackage (runCabal2nix {
+      inherit name;
+      url = fetchFromGitHub {
+        inherit repo rev sha256;
+        owner = "Warbo";
+      };
+    }) {};
 
   # Override haskellPackages entries to ensure compatible dependencies are used
   # for ML4HSFE and the other libraries we want to use with it. We do this here
@@ -60,32 +48,15 @@ with rec {
         # If this is 2.10+ then quickspec 0.9.6 hits an "ambiguous 'total'"
         # error. Version 2.9 hits problems elsewhere, with semigroups, instances
         # and quickcheck-io packages.
-        QuickCheck = getHackage {
-          inherit self;
-          name    = "QuickCheck";
-          version = "2.8.2";
-          sha256  = "1ai6k5v0bibaxq8xffcblc6rwmmk6gf8vjyd9p2h3y6vwbhlvilq";
-        };
+        QuickCheck = self.callHackage "QuickCheck" "2.8.2" {};
 
         # We use QuickSpec version 1 (0.9.6) since version 2+ is very different
-        quickspec = getHackage {
-          inherit self;
-          name    = "quickspec";
-          version = "0.9.6";
-          sha256  = "0prwzxsrvfqryl75rmma229d4y7ra61vc3d72kyqi4l44ga2ay21";
-        };
+        quickspec = self.callHackage "quickspec" "0.9.6" {};
 
-        # This package's dependencies differ depending on whether we're using
-        # GHC 7 (semigroups dependency is added) or GHC 8 (no semigroups
-        # dependency). The nixpkgs package is the same across all of its Haskell
-        # package sets; in particular, no semigroups dependency is passed in,
-        # even if we're using GHC 7 that needs it.
-        system-filepath = getHackage {
-          inherit self;
-          name    = "system-filepath";
-          version = "0.4.13.4";
-          sha256  = "1yy5zsmmimhg6iaw9fmpwrxvxrgi5s6bfyqfihdsnx4bjvn7sp9l";
-        };
+        # This package was converted to Nix in the context of GHC 8, but it
+        # depends on semigroups when using GHC 7.
+        system-filepath = haskell.lib.addBuildDepend super.system-filepath
+                                                     self.semigroups;
       });
   });
 
