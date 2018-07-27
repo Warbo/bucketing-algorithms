@@ -55,6 +55,7 @@ the full ground truth, if no bucketing were used).
 */
 { fail, jq, python3, runCommand, withDeps, wrap }:
 
+with builtins;
 with rec {
   cmd = wrap {
     name   = "calculateProportions";
@@ -176,6 +177,54 @@ with rec {
     {
       inherit cmd;
       buildInputs = [ fail jq ];
+
+      noSample = toJSON {
+        "1" = {
+          "1" = {
+            foo = {
+              "1" = {
+                names    = [ "x" ];
+                theorems = [ "y" ];
+              };
+            };
+          };
+        };
+      };
+
+      nameError = toJSON {
+        "1" = {
+          "1" = {
+            sample = {
+              names    = [ "n" ];
+              theorems = [ "t" ];
+            };
+            m = {
+              "1" = {
+                names    = [ ["n"] ["m"] ];
+                theorems = [             ];
+              };
+            };
+          };
+        };
+      };
+
+      oneThird = toJSON {
+        "1" = {
+          "1" = {
+            sample = {
+              names    = [     "n"     ];
+              theorems = [ "t" "u" "v" ];
+            };
+            m = {
+              "1" = {
+                names    = [ [ "n" ] ];
+                theorems = [   "u"   ];
+              };
+            };
+          };
+          "2" = null;
+        };
+      };
     }
     ''
       set -o pipefail
@@ -185,22 +234,13 @@ with rec {
         fail "Failed on empty object\n$O"
       echo "$O" | jq -e '. == {}' || fail "Wanted {}, got:\n$O"
 
-      O=$(echo '{"1":{"1":{"foo":{"1":{"names":["x"],"theorems":["y"]}}}}}' |
-          "$cmd" 2>&1 | tee "$out/nosample.json") &&
+      O=$(echo "$noSample" | "$cmd" 2>&1 | tee "$out/nosample.json") &&
         fail "Should've failed without 'sample'\n$O"
 
-      O=$(echo '{"1":{"1":{"sample":{"names"   :["n"],
-                                     "theorems":["t"]},
-                           "m":{"1":{"names"   :[["n"],["m"]],
-                                     "theorems":[]}}}}}' |
-          "$cmd" 2>&1 | tee "$out/nameerror.json") &&
+      O=$(echo "$nameError" | "$cmd" 2>&1 | tee "$out/nameerror.json") &&
         fail "Should've failed with differing names\n$O"
 
-      O=$(echo '{"1":{"1":{"sample":{"names"   :["n"],
-                                     "theorems":["t","u","v"]},
-                           "m":{"1":{"names"   :[["n"]],
-                                     "theorems":["u"]}}}}}' |
-          "$cmd" | tee "$out/onethird.json") ||
+      O=$(echo "$oneThird" | "$cmd" | tee "$out/onethird.json") ||
         fail "Failed when given valid input\n$O"
 
       C=$(echo "$O" | jq '.["1"] | .["1"] | .m | .["1"] | .comparison') ||

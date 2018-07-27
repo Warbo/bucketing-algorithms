@@ -1,5 +1,6 @@
 { calculateProportions, fail, jq, python3, runCommand, withDeps, wrap }:
 
+with builtins;
 with rec {
   cmd = wrap {
     name   = "averageProportions";
@@ -13,21 +14,50 @@ with rec {
 
       concat = lambda xs: reduce(lambda x, y: x + y, xs, [])
 
+      dropDupes = lambda d: list(filter(lambda k: d[k] is not None, d.keys()))
+
       def process(data):
+        assert type(data) == type({}), repr({
+          'error' : 'Expected dictionary in "process"',
+          'given' : data
+        })
         return {s: processSize(x) for s, x in data.items()}
 
       def processSize(data):
-        methods = list(set(concat([list(data[rep].keys()) for rep in data])))
+        assert type(data) == type({}), repr({
+          'error' : 'Expected dictionary in "processSize"',
+          'given' : data
+        })
+        noDupes = dropDupes(data)
+        methods = list(set(concat([list(data[rep].keys()) for rep in noDupes])))
         return {m: processMethod(data, m) for m in methods if m != "sample"}
 
       def processMethod(data, method):
-        bucketSizes = [list(data[rep][method].keys()) for rep in data]
+        assert type(data) == type({}), repr({
+          'error'  : 'Expected "data" to be dictionary in "processMethod"',
+          'data'   : data,
+          'method' : method
+        })
+        assert type(method) == type(""), repr({
+          'error'  : 'Expected "method" to be string in "processMethod"',
+          'data'   : data,
+          'method' : method
+        })
+        noDupes     = dropDupes(data)
+        bucketSizes = [list(data[rep][method].keys()) for rep in noDupes]
         bucketSizes = list(set(concat(bucketSizes)))
         return {bs: processBucketSize(data, method, bs) for bs in bucketSizes}
 
       def processBucketSize(data, method, bSize):
+        assert type(data) == type({}), repr({
+          'error'  : 'Expected "data" to be dictionary in "processBucketSize"',
+          'data'   : data,
+          'method' : method,
+          'bSize'  : bSize
+        })
+        noDupes     = dropDupes(data)
         proportions = [data[rep][method][bSize]['comparison']['proportion'] \
-                       for rep in data]
+                       for rep in noDupes]
 
         count    = float(len(proportions))
         mean     = float(sum(proportions)) / count
@@ -36,7 +66,15 @@ with rec {
         return {'proportion': {'mean'  : mean,
                                'stddev': stddev}}
 
-      print(json.dumps(process(json.loads(sys.stdin.read()))))
+      given = sys.stdin.read()
+      try:
+        print(json.dumps(process(json.loads(given))))
+      except:
+        sys.stderr.write(repr({
+          'error' : 'Failed to average',
+          'stdin' : given
+        }) + '\n')
+        raise
     '';
   };
 
@@ -44,32 +82,68 @@ with rec {
     {
       inherit cmd;
       buildInputs = [ fail jq ];
+      example     = toJSON {
+        "1" = {
+          "1" = {
+            sample = {
+              names =    [    "n"    ];
+              theorems = [ "t1" "t2" ];
+            };
+            a = {
+              "1" = {
+                names =    [ [ "n" ] ];
+                theorems = [   "t1"  ];
+              };
+              "2" = {
+                names =    [  [ "n" ]  ];
+                theorems = [ "t1" "t2" ];
+              };
+            };
+            b = {
+              "1" = {
+                names    = [ [ "n" ] ];
+                theorems = [         ];
+              };
+              "2" = {
+                names    = [ [ "n" ] ];
+                theorems = [   "t2"  ];
+              };
+            };
+          };
+          "2" = {
+            sample = {
+              names    = [ "n2" ];
+              theorems = [ "t3" ];
+            };
+            a = {
+              "1" = {
+                names    = [ [ "n2" ] ];
+                theorems = [   "t3"   ];
+              };
+              "2" = {
+                names    = [ [ "n2" ] ];
+                theorems = [   "t3"   ];
+              };
+            };
+            b = {
+              "1" = {
+                names    = [ [ "n2" ] ];
+                theorems = [          ];
+              };
+              "2" = {
+                names    = [ [ "n2" ] ];
+                theorems = [   "t3"   ];
+              };
+            };
+          };
+          "3" = null;
+        };
+      };
     }
     ''
       O=$(echo '{}' | "$cmd") || fail "Failed on empty input\n$O"
 
-      INPUT='{"1":{"1":{"sample":{"names":   ["n"],
-                                  "theorems":["t1","t2"]},
-                        "a":{"1":{"names":   [["n"]],
-                                  "theorems":["t1"]},
-                             "2":{"names":   [["n"]],
-                                  "theorems":["t1","t2"]}},
-                        "b":{"1":{"names":   [["n"]],
-                                  "theorems":[]},
-                             "2":{"names":   [["n"]],
-                                  "theorems":["t2"]}}},
-                   "2":{"sample":{"names":   ["n2"],
-                                  "theorems":["t3"]},
-                        "a":{"1":{"names":   [["n2"]],
-                                  "theorems":["t3"]},
-                             "2":{"names":   [["n2"]],
-                                  "theorems":["t3"]}},
-                        "b":{"1":{"names":   [["n2"]],
-                                  "theorems":[]},
-                             "2":{"names":   [["n2"]],
-                                  "theorems":["t3"]}}}}}'
-
-      PS=$(echo "$INPUT" | "${calculateProportions}") ||
+      PS=$(echo "$example" | "${calculateProportions}") ||
         fail "Couldn't calculate proportions\n$PS"
 
       O=$(echo "$PS" | "$cmd") || fail "Couldn't average. In:\n$PS\nOut:\n$O"
