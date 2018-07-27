@@ -83,7 +83,8 @@ with rec {
           'error': 'Expected dictionary for "processSize"',
           'given': data
         })
-        return {r: processRep(x) for r, x in data.items()}
+        # Some reps are None ('null' in JSON) since they're dupes. Skip them.
+        return {r: x if x is None else processRep(x) for r, x in data.items()}
 
       def processRep(data):
         assert type(data) == type({}), repr({
