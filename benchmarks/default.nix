@@ -34,7 +34,20 @@ fixed.mkBin {
         };
         script = ''
           #!/usr/bin/env bash
-          exec "${measured.benchmarkingCommands.makeDupeSamples}"
+
+          function stripExpected {
+            # This removes the stderr messages we expect from the sampler, since
+            # there will be a lot of them and ASV will dump them all out.
+            grep -v '^ *Sampling [0-9]* names from a total of [0-9]*$' |
+            grep -v '^ *Converted all theorem dependencies into constraints$'
+            grep -v '^ *Calculated frequency for each constraint$'
+            grep -v '^ *Shuffling names$'
+            grep -v '^ *Obtained sample$'
+            grep -v '^ *Size [0-9]* rep [0-9]*$'
+          }
+
+          "${measured.benchmarkingCommands.makeDupeSamples}" \
+            2> >(stripExpected 1>&2)
         '';
       };
     };
