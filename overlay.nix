@@ -118,6 +118,7 @@ fold appendDef
     bucketing-algorithms-tests = {};
   })
   [
+    "asv-nix"
     "averageProportions"
     "benchmark"
     "benchmarkingCommands"
