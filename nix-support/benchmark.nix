@@ -1,7 +1,10 @@
 # Runs the benchmarks with some default options. We also use this for our
 # shell.nix environment.
-{ asv-nix, fixHtml, nixpkgs1609, runCommand, withNix }:
+{ asv-nix, callPackage, nixpkgs1609, runCommand, withNix }:
 
+with {
+  fixHtml = callPackage ./fixHtml.nix {};
+};
 runCommand "bucketing-algorithm-benchmark"
   (withNix {
     buildInputs  = [ asv-nix fixHtml nixpkgs1609.git nixpkgs1609.rsync ];

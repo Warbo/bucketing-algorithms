@@ -78,10 +78,6 @@ with rec {
 
     inherit (self.haskellTE)
       testData;
-
-    # TODO: Turn these into normal appendDef definitions
-    asv-nix = self.callPackage ./benchmarks/asv-nix.nix {};
-    fixHtml = self.callPackage ./benchmarks/fixHtml.nix {};
   };
 
   # Imports a file and calls it as a function with args from 'self' (allowing
