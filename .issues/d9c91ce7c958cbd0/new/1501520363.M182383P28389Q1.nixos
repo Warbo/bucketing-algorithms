@@ -1,8 +1,9 @@
 From: Chris Warburton
 Date: Mon, 31 Jul 2017 17:54:08 +0100
-State: new
+State: resolved
 Subject: Apply memory limits to individual buckets
 Message-Id: <d9c91ce7c958cbd0-0-artemis@nixos>
+resolution: fixed
 
 We can run MLSpec without a memory cutoff, but it's dangerous as it'll
 gladly eat up all of our RAM.

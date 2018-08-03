@@ -1,0 +1,8 @@
+From: Chris Warburton
+Date: Fri, 03 Aug 2018 18:59:55 +0100
+Subject: Re: Apply memory limits to individual buckets
+Message-Id: <d9c91ce7c958cbd0-b04e8fe092dafbe3-artemis@nixos>
+References: <d9c91ce7c958cbd0-0-artemis@nixos>
+In-Reply-To: <d9c91ce7c958cbd0-0-artemis@nixos>
+
+This is more relevant to haskell-te than bucketing-algorithms

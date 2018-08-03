@@ -1,47 +1,25 @@
 # Theory Exploration Bucketing Benchmarks #
 
 This directory contains benchmarks for various algorithmic ways to divide up
-ASTS into "buckets", as a divide-and-conquer approach to improving theory
+ASTs into "buckets", as a divide-and-conquer approach to improving theory
 exploration systems.
 
 We use the Theory Exploration Benchmark project, which includes a corpus of
 definitions and statements. Subsets of these definitions are sampled
-(deterministically), and the applicable statements are used as the ground truth.
+(deterministically), and the properties of those definitions are used as the
+ground truth.
 
 ## Running Benchmarks ##
 
 We use `asv` to run the benchmarks and manage the results. A suitable
-environment can be entered by running `nix-shell benchmarkEnv.nix` from the root
-directory of this repository (i.e. the directory above this `benchmarks/` one).
+environment can be entered by running `nix-shell` from the root directory of
+this repository (i.e. the directory above this `benchmarks/` one).
 
 The usual `asv` commands can be used: `asv run`, `asv publish`, etc.
 
-Note that benchmarking can take a while. In particular, we do all of the
-exploration in the 'setup' phase rather than in the benchmarks themselves; this
-makes the setup phase slow, but the benchmarks which follow are almost instant.
+Our policy is not to commit ASV benchmark results, since they are "derived" data
+which can be regenerated programatically (albeit with noise and machine-specific
+characteristics).
 
-Our policy is to commit benchmark results (which include the raw input/output
-data and specs of the machine) to git to ensure reproducibility. We do two
-things to save resources:
-
- - We don't commit any "derived" data. In particular, we don't include any HTML
-   reports, since they can be regenerated automatically.
- - When we want to store a benchmark run, we first compress it with lzip. This
-   *drastically* reduces the file size, and doesn't negatively affect git usage
-   since these results will never change (that would be tampering!)
-
-To store a result, commit any `benchmarks.json` and `machine.json` files as-is,
-and lzip the benchmark output using a command like:
-
-    lzip <       .asv/results/<machine-name>/<commit-id>-<args>.json \
-         > benchmarks/results/<machine-name>/<commit-id>-<args>.json.lz
-
-Commit the resulting `.json.lz` file, but not the original `.json` file. When
-committing new results, keep in mind that the raw data can get quite large, and
-these will hang around forever in git. Hence only include those which are
-reliable (e.g. don't run benchmarks at the same time as other resource-intensive
-programs).
-
-To use this lzipped data with asv, it can simply be unzipped into place. The
-benchmarking environment provides an `unzipBenchmarks` command which will do
-this for you.
+We only store results from our evaluation script, which uses much more data than
+the ASV benchmarks (which are meant to be reasonably fast).

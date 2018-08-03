@@ -1,0 +1,8 @@
+From: Chris Warburton
+Date: Fri, 03 Aug 2018 19:12:03 +0100
+Subject: Re: Remove the complicated nix-support/*specBench stuff
+Message-Id: <dee3112df2cc9787-8c2d13f8afd01624-artemis@nixos>
+References: <dee3112df2cc9787-0-artemis@nixos>
+In-Reply-To: <dee3112df2cc9787-0-artemis@nixos>
+
+Left over from haskell-te

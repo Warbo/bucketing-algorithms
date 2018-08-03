@@ -1,8 +1,9 @@
 From: Chris Warburton
 Date: Tue, 01 Aug 2017 17:27:13 +0100
-State: new
+State: resolved
 Subject: Remove the complicated nix-support/*specBench stuff
 Message-Id: <dee3112df2cc9787-0-artemis@nixos>
+resolution: fixed
 
 These used to be standalone commands, which looped through many samples,
 timed themselves, etc.

@@ -1,0 +1,8 @@
+From: Chris Warburton
+Date: Fri, 03 Aug 2018 19:10:39 +0100
+Subject: Re: Strip raw output when unzipping benchmarks
+Message-Id: <e50204d75ce60776-994821ed754baf31-artemis@nixos>
+References: <e50204d75ce60776-0-artemis@nixos>
+In-Reply-To: <e50204d75ce60776-0-artemis@nixos>
+
+We don't store benchmarks
