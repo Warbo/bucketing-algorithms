@@ -61,7 +61,7 @@ rec {
 
   makeDupeSamples = callPackage ./makeDupeSamples.nix {};
 
-  dedupeSamples = callPackage ./dedupeSamples.nix {};
+  dedupeSamples = callPackage ./dedupeSamples.nix { inherit makeDupeSamples; };
 
   getGroundTruths = callPackage ./getGroundTruths.nix {};
 }
