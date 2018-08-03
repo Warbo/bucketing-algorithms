@@ -13,12 +13,10 @@ with {
       for size in data:
         seen = []
         for iRep in sorted([int(rep) for rep in data[size]]):
-          rep = str(iRep)
-          sample = frozenset(data[size][rep])
-          if sample in seen:
-            data[size][rep] = None
-          else:
-            data[size][rep] = {'sample': data[size][rep]}
+          rep             = str(iRep)
+          sample          = frozenset(data[size][rep])
+          data[size][rep] = None if sample in seen \
+                                 else {'sample': data[size][rep]}
           seen += [sample]
       print(json.dumps(data))
     '';
