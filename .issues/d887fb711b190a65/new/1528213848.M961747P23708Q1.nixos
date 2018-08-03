@@ -1,8 +1,9 @@
 From: Chris Warburton
 Date: Tue, 05 Jun 2018 16:45:16 +0100
-State: new
+State: resolved
 Subject: Move benchmarks/env.nix to benchmarks/default.nix
 Message-Id: <d887fb711b190a65-0-artemis@nixos>
+resolution: fixed
 
 Minor change, but would make things a bit nicer. A couple of reasons we
 haven't done this yet:

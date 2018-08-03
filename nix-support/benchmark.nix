@@ -9,7 +9,7 @@ runCommand "bucketing-algorithm-benchmark"
   (withNix {
     buildInputs  = [ asv-nix fixHtml nixpkgs1609.git nixpkgs1609.rsync ];
 
-    existing     = import ../benchmarks/env.nix {
+    existing     = import ../benchmarks {
       dir  = ../.;
       root = ../.;
     };
