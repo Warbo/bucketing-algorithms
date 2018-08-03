@@ -27,11 +27,13 @@ fixed.mkBin {
         getGroundTruths;
 
       sample = with fixed; wrap {
-        name = "sample";
+        name   = "sample";
+        vars   = {
+          sizes = toJSON (range 1 100);
+          reps  = "100";
+        };
         script = ''
           #!/usr/bin/env bash
-          export sizes="[$1]"
-          export  reps="$2"
           exec "${measured.benchmarkingCommands.makeDupeSamples}"
         '';
       };
