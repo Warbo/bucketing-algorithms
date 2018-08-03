@@ -18,9 +18,7 @@ fixed.mkBin {
   paths = with fixed.nixpkgs1609; [ (python3.withPackages (p: [])) ];
   vars  = {
     inherit root;
-
-    # To avoid Python saying 'Unable to get the locale encoding'
-    LANG = "en_GB.UTF-8";
+    LANG = "en_US.UTF-8";
 
     # All of the scripts to benchmark should be in here, taken from measured
     commands = toJSON {

@@ -5,6 +5,7 @@ with rec {
   go = wrap {
     name   = "dedupe.py";
     paths  = [ python3 ];
+    vars   = { LANG = "en_US.UTF-8"; };
     script = ''
       #!/usr/bin/env python3
       import json

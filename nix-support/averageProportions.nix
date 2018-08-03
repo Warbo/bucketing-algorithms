@@ -5,6 +5,7 @@ with rec {
   cmd = wrap {
     name   = "averageProportions";
     paths  = [ python3 ];
+    vars   = { LANG = "en_US.UTF-8"; };
     script = ''
       #!/usr/bin/env python3
       from functools import reduce
