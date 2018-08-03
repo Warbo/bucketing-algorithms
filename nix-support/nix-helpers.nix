@@ -6,8 +6,8 @@ with {
     src = fetchFromGitHub {
       owner  = "Warbo";
       repo   = "nix-helpers";
-      rev    = "785b2be";
-      sha256 = "0yybw870dqzkh7qq91winlsncy2j9zq34bc2zl04727rqy4ph8n5";
+      rev    = "72d9d88";
+      sha256 = "1kggqr07dz2widv895wp8g1x314lqg19p67nzr3b97pg97amhjsi";
     };
   };
 };

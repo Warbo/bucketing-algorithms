@@ -6,8 +6,8 @@ with {
     src = fetchFromGitHub {
       owner  = "Warbo";
       repo   = "warbo-packages";
-      rev    = "21c07e0";
-      sha256 = "19y7h658s013ikqmj4dsnfyx9962q3ybbvzi2bczzcg3zhplqmd3";
+      rev    = "fadf087";
+      sha256 = "0z4jk3wk9lhlq3njr22wsr9plf5fw7mmpbky8l8ppn0gp698vq63";
     };
   };
 };
