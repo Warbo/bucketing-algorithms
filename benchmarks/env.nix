@@ -27,6 +27,16 @@ fixed.mkBin {
       inherit (measured.benchmarkingCommands)
         addHashBucketsCmd addRecurrentBucketsCmd astsOf dedupeSamples
         getGroundTruths;
+
+      sample = with fixed; wrap {
+        name = "sample";
+        script = ''
+          #!/usr/bin/env bash
+          export sizes="[$1]"
+          export  reps="$2"
+          exec "${measured.benchmarkingCommands.makeDupeSamples}"
+        '';
+      };
     };
 
     # A fixed set of samples, for scripts which need them as input
