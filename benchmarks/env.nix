@@ -19,6 +19,9 @@ fixed.mkBin {
   vars  = {
     inherit root;
 
+    # To avoid Python saying 'Unable to get the locale encoding'
+    LANG = "en_GB.UTF-8";
+
     # All of the scripts to benchmark should be in here, taken from measured
     commands = toJSON {
       inherit (measured.benchmarkingCommands)
