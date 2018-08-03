@@ -43,15 +43,10 @@ runCommand "bucketing-algorithm-benchmark"
 
     # Real values taken from a Thinkpad X60s
     echo "Generating machine config" 1>&2
-    asv machine --arch    "i686"                                            \
-                --cpu     "Genuine Intel(R) CPU           L2400  @ 1.66GHz" \
-                --machine "default"                                         \
-                --os      "Linux 4.4.52"                                    \
-                --ram     "3093764"
+    asv machine --yes
 
     echo "Run all benchmarks in pre-build environment" 1>&2
-    asv run --show-stderr --machine default \
-                          --environment "existing:$existing/bin/python"
+    asv run --show-stderr --environment "existing:$existing/bin/python"
 
     echo "Generating HTML reports" 1>&2
     asv publish --environment "existing:$existing/bin/python"
