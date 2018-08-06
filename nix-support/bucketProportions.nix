@@ -6,13 +6,7 @@
   makeSamples, python3, runCommand, tebenchmark, wrap }:
 with { inherit (builtins) concatStringsSep map; };
 
-given: with rec {
-  samplingParams = if given != {}
-                      then given
-                      else { maxSize = 100; reps = 100; };
-
-  samples = makeSamples samplingParams;
-
+with rec {
   # Runs each sample through the stdio of a given program, adding the result to
   # the samples JSON. Useful for running a bucketing script on each sample.
   processSamplesScript = { key, prog }: wrap {
@@ -55,36 +49,6 @@ given: with rec {
     '';
   };
 
-  processSamples = { key, prog, samples }: runCommand "processed-${key}.json"
-    {
-      inherit samples;
-      script = processSamplesScript { inherit key prog; };
-    }
-    ''
-      "$script" < "$samples" > "$out"
-    '';
-
-  addHashBuckets = samples: processSamples {
-    inherit samples;
-    key  = "hashed";
-    prog = benchmarkingCommands.addHashBucketsCmd;
-  };
-
-  addRecurrentBuckets = samples: processSamples {
-    inherit samples;
-    key  = "recurrent";
-    prog = benchmarkingCommands.addRecurrentBucketsCmd;
-  };
-
-  groundTruthsOf = samples: runCommand "ground-truths.json"
-    {
-      inherit samples;
-      inherit (benchmarkingCommands) getGroundTruths;
-    }
-    ''"$getGroundTruths" < "$samples" > "$out"'';
-
-  addAllBuckets = samples: addHashBuckets (addRecurrentBuckets samples);
-
   proportionsOf = data: runCommand "proportions-of"
     { inherit data calculateProportions; }
     ''"$calculateProportions" < "$data" > "$out"'';
@@ -92,8 +56,41 @@ given: with rec {
   averagesOf = data: runCommand "averages-of"
     { inherit averageProportions data; }
     ''"$averageProportions" < "$data" > "$out"'';
+
+  go = samples:
+    with rec {
+      processSamples = { key, prog }: runCommand "processed-${key}.json"
+        {
+          inherit samples;
+          script = processSamplesScript { inherit key prog; };
+        }
+        ''"$script" < "$samples" > "$out"'';
+
+      addHashBuckets = samples: processSamples {
+        key  = "hashed";
+        prog = benchmarkingCommands.addHashBucketsCmd;
+      };
+
+      addRecurrentBuckets = samples: processSamples {
+        key  = "recurrent";
+        prog = benchmarkingCommands.addRecurrentBucketsCmd;
+      };
+
+      groundTruthsOf = samples: runCommand "ground-truths.json"
+        {
+          inherit samples;
+          inherit (benchmarkingCommands) getGroundTruths;
+        }
+        ''"$getGroundTruths" < "$samples" > "$out"'';
+
+      addAllBuckets = samples: addHashBuckets (addRecurrentBuckets samples);
+    };
+    rec {
+      proportions = proportionsOf (groundTruthsOf (addAllBuckets samples));
+      averages    = averagesOf proportions;
+    };
 };
-rec {
-  proportions = proportionsOf (groundTruthsOf (addAllBuckets samples));
-  averages    = averagesOf proportions;
-}
+
+given: go (makeSamples (if given != {}
+                           then given
+                           else { maxSize = 100; reps = 100; }))
