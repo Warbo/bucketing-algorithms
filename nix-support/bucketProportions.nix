@@ -49,28 +49,24 @@ with rec {
     '';
   };
 
-  go = samples:
-    with {
-      addRecurrentBuckets =
-        runOn "processed-recurrent.json"
-              (processSamplesScript {
-                key  = "recurrent";
-                prog = benchmarkingCommands.addRecurrentBucketsCmd;
-              });
-    };
-    rec {
-      proportions = runOn "proportions-of"
-                          calculateProportions
-                          (runOn "ground-truths.json"
-                                 benchmarkingCommands.getGroundTruths
-                                 (runOn "processed-hashed.json"
-                                        (processSamplesScript {
-                                          key  = "hashed";
-                                          prog = benchmarkingCommands.addHashBucketsCmd;
-                                        })
-                                        (addRecurrentBuckets samples)));
-      averages    = runOn    "averages-of"   averageProportions proportions;
-    };
+  go = samples: rec {
+    proportions = runOn "proportions-of"
+                        calculateProportions
+                        (runOn "ground-truths.json"
+                               benchmarkingCommands.getGroundTruths
+                               (runOn "processed-hashed.json"
+                                      (processSamplesScript {
+                                        key  = "hashed";
+                                        prog = benchmarkingCommands.addHashBucketsCmd;
+                                      })
+                                      (runOn "processed-recurrent.json"
+                                             (processSamplesScript {
+                                               key  = "recurrent";
+                                               prog = benchmarkingCommands.addRecurrentBucketsCmd;
+                                             })
+                                             samples)));
+    averages    = runOn    "averages-of"   averageProportions proportions;
+  };
 };
 
 given: go (makeSamples (if given != {}
