@@ -51,13 +51,6 @@ with rec {
 
   go = samples:
     with {
-      addHashBuckets =
-        runOn "processed-hashed.json"
-              (processSamplesScript {
-                key  = "hashed";
-                prog = benchmarkingCommands.addHashBucketsCmd;
-              });
-
       addRecurrentBuckets =
         runOn "processed-recurrent.json"
               (processSamplesScript {
@@ -70,7 +63,12 @@ with rec {
                           calculateProportions
                           (runOn "ground-truths.json"
                                  benchmarkingCommands.getGroundTruths
-                                 (addHashBuckets (addRecurrentBuckets samples)));
+                                 (runOn "processed-hashed.json"
+                                        (processSamplesScript {
+                                          key  = "hashed";
+                                          prog = benchmarkingCommands.addHashBucketsCmd;
+                                        })
+                                        (addRecurrentBuckets samples)));
       averages    = runOn    "averages-of"   averageProportions proportions;
     };
 };
