@@ -49,23 +49,22 @@ with rec {
     '';
   };
 
+  proportionsScript = composeBins "proportions-script" [
+    (processSamplesScript {
+      key  = "recurrent";
+      prog = benchmarkingCommands.addRecurrentBucketsCmd;
+    })
+      (processSamplesScript {
+      key  = "hashed";
+      prog = benchmarkingCommands.addHashBucketsCmd;
+    })
+    benchmarkingCommands.getGroundTruths
+    calculateProportions
+  ];
+
   go = samples: rec {
-    proportions = runOn "proportions-of"
-                        calculateProportions
-                        (runOn "ground-truths.json"
-                               benchmarkingCommands.getGroundTruths
-                               (runOn "processed-hashed.json"
-                                      (processSamplesScript {
-                                        key  = "hashed";
-                                        prog = benchmarkingCommands.addHashBucketsCmd;
-                                      })
-                                      (runOn "processed-recurrent.json"
-                                             (processSamplesScript {
-                                               key  = "recurrent";
-                                               prog = benchmarkingCommands.addRecurrentBucketsCmd;
-                                             })
-                                             samples)));
-    averages    = runOn    "averages-of"   averageProportions proportions;
+    proportions = runOn "proportions-of.json" proportionsScript samples;
+    averages    = runOn    "averages-of.json" averageProportions proportions;
   };
 };
 
