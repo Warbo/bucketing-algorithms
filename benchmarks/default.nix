@@ -28,26 +28,52 @@ fixed.mkBin {
 
       sample = with fixed; wrap {
         name   = "sample";
-        vars   = {
-          sizes = toJSON (range 1 100);
-          reps  = "100";
-        };
+        paths  = [ nixpkgs1803.python3 ];
+        vars   = { reps  = "2"; sizes = toJSON (range 1 100); };
         script = ''
-          #!/usr/bin/env bash
+          #!/usr/bin/env python3
+          import re
+          import subprocess
+          import sys
 
-          function stripExpected {
-            # This removes the stderr messages we expect from the sampler, since
-            # there will be a lot of them and ASV will dump them all out.
-            grep -v '^ *Sampling [0-9]* names from a total of [0-9]*$' |
-            grep -v '^ *Converted all theorem dependencies into constraints$'
-            grep -v '^ *Calculated frequency for each constraint$'
-            grep -v '^ *Shuffling names$'
-            grep -v '^ *Obtained sample$'
-            grep -v '^ *Size [0-9]* rep [0-9]*$'
-          }
+          fixed = [
+            'Converted all theorem dependencies into constraints',
+            'Calculated frequency for each constraint',
+            'Shuffling names',
+            'Obtained sample'
+          ]
 
-          "${measured.benchmarkingCommands.makeDupeSamples}" \
-            2> >(stripExpected 1>&2)
+          regexen = map(re.compile, [
+            '^Sampling \d* names from a total of \d*$'
+            '^Size \d* rep \d*$'
+          ])
+
+          def unexpected(line):
+            """Whether a line of stderr is expected. This lets us filter out
+            noise which ASV would otherwise print out."""
+            s = line.strip()
+            if s in fixed: return False
+            for r in regexen:
+              if r.match(s): return False
+            return True
+
+          def writeErr(p):
+            """Output the given process's stderr, after filtering out expected
+            lines."""
+            sys.stderr.write('\n'.join(filter(unexpected,
+                                              p.stderr.split('\n'))))
+
+          try:
+            p = subprocess.run(
+              ["${measured.benchmarkingCommands.makeDupeSamples}"],
+              capture_output = True,
+              text           = True,
+              check          = True)
+          except:
+            writeErr(p)
+            raise
+          writeErr(p)
+          print(p.stdout)
         '';
       };
     };
