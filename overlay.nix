@@ -129,7 +129,7 @@ fold appendDef
     "makeSamples"
     "nix-helpers"
     "package"
-    "performance"
+    "performanceScript"
     "recurrentBucket"
     "runCabal2nix"
     "runOn"
