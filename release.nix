@@ -3,5 +3,5 @@
 # tests, benchmarks, etc.
 {
   inherit (import ./.)
-    benchmark package performance;
+    benchmark package performanceScript;
 }

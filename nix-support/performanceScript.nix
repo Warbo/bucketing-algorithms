@@ -1,6 +1,6 @@
 { bucketProportions }:
 
 bucketProportions {
-  maxSize = 10;
-  reps    = 10;
+  maxSize = 100;
+  reps    = 100;
 }
