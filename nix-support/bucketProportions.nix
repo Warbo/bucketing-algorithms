@@ -2,8 +2,8 @@
 # proportion of ground truth theorems which apply to the resulting buckets.
 #
 # Write output to JSON for archiving.
-{ averageProportions, benchmarkingCommands, calculateProportions, jq, lib,
-  makeSamples, python3, runCommand, runOn, tebenchmark, wrap }:
+{ averageProportions, benchmarkingCommands, calculateProportions, composeBins,
+  jq, lib, makeSamples, python3, runCommand, runOn, tebenchmark, wrap }:
 with { inherit (builtins) concatStringsSep map; };
 
 with rec {
