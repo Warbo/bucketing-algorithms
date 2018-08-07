@@ -131,6 +131,7 @@ fold appendDef
     "performance"
     "recurrentBucket"
     "runCabal2nix"
+    "runOn"
     "tebenchmark"
     "warbo-packages"
   ]

@@ -3,7 +3,7 @@
 #
 # Write output to JSON for archiving.
 { averageProportions, benchmarkingCommands, calculateProportions, jq, lib,
-  makeSamples, python3, runCommand, tebenchmark, wrap }:
+  makeSamples, python3, runCommand, runOn, tebenchmark, wrap }:
 with { inherit (builtins) concatStringsSep map; };
 
 with rec {
@@ -49,45 +49,31 @@ with rec {
     '';
   };
 
-  proportionsOf = data: runCommand "proportions-of"
-    { inherit data calculateProportions; }
-    ''"$calculateProportions" < "$data" > "$out"'';
-
-  averagesOf = data: runCommand "averages-of"
-    { inherit averageProportions data; }
-    ''"$averageProportions" < "$data" > "$out"'';
-
   go = samples:
-    with rec {
-      processSamples = { key, prog }: runCommand "processed-${key}.json"
-        {
-          inherit samples;
-          script = processSamplesScript { inherit key prog; };
-        }
-        ''"$script" < "$samples" > "$out"'';
+    with {
+      addHashBuckets = samples:
+        runOn "processed-hashed.json"
+              (processSamplesScript {
+                key  = "hashed";
+                prog = benchmarkingCommands.addHashBucketsCmd;
+              })
+              samples;
 
-      addHashBuckets = samples: processSamples {
-        key  = "hashed";
-        prog = benchmarkingCommands.addHashBucketsCmd;
-      };
-
-      addRecurrentBuckets = samples: processSamples {
-        key  = "recurrent";
-        prog = benchmarkingCommands.addRecurrentBucketsCmd;
-      };
-
-      groundTruthsOf = samples: runCommand "ground-truths.json"
-        {
-          inherit samples;
-          inherit (benchmarkingCommands) getGroundTruths;
-        }
-        ''"$getGroundTruths" < "$samples" > "$out"'';
-
-      addAllBuckets = samples: addHashBuckets (addRecurrentBuckets samples);
+      addRecurrentBuckets = samples:
+        runOn "processed-recurrent.json"
+              (processSamplesScript {
+                key  = "recurrent";
+                prog = benchmarkingCommands.addRecurrentBucketsCmd;
+              })
+              samples;
     };
     rec {
-      proportions = proportionsOf (groundTruthsOf (addAllBuckets samples));
-      averages    = averagesOf proportions;
+      proportions = runOn "proportions-of"
+                          calculateProportions
+                          (runOn "ground-truths.json"
+                                 benchmarkingCommands.getGroundTruths
+                                 (addHashBuckets (addRecurrentBuckets samples)));
+      averages    = runOn    "averages-of"   averageProportions proportions;
     };
 };
 
