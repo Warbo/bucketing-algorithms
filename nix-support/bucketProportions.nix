@@ -11,7 +11,7 @@ with rec {
   # the samples JSON. Useful for running a bucketing script on each sample.
   processSamplesScript = { key, prog }: wrap {
     name   = "process-samples.py";
-    paths  = [ python3 ];
+    paths  = [ (python3.withPackages (p: [])) ];
     vars   = { inherit key prog; LANG = "en_US.UTF-8"; };
     script = ''
       #!/usr/bin/env python3

@@ -31,7 +31,7 @@ fixed.mkBin {
       # and to set the env vars that are needed to control the sampling.
       sample = with fixed; wrap {
         name   = "sample";
-        paths  = [ nixpkgs1803.python3 ];  # For subprocess.run
+        paths  = [ (nixpkgs1803.python3.withPackages (p:[])) ];  # For subprocess.run
         vars   = { reps  = "2"; sizes = toJSON (range 1 100); };
         script = ''
           #!/usr/bin/env python3

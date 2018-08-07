@@ -41,7 +41,7 @@ with rec {
 };
 mkBin {
   name   = "fixHtml";
-  paths  = [ python ];
+  paths  = [ (python.withPackages (p: [])) ];
   script = ''
     #!/usr/bin/env python
     import sys

@@ -4,7 +4,7 @@ with builtins;
 with rec {
   go = wrap {
     name   = "dedupe.py";
-    paths  = [ python3 ];
+    paths  = [ (python3.withPackages (p: [])) ];
     vars   = { LANG = "en_US.UTF-8"; };
     script = ''
       #!/usr/bin/env python3
