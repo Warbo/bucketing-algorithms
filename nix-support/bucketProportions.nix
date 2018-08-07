@@ -61,13 +61,23 @@ with rec {
     benchmarkingCommands.getGroundTruths
     calculateProportions
   ];
-
-  go = samples: rec {
-    proportions = runOn "proportions-of.json" proportionsScript samples;
-    averages    = runOn    "averages-of.json" averageProportions proportions;
-  };
 };
 
-given: go (makeSamples (if given != {}
-                           then given
-                           else { maxSize = 100; reps = 100; }))
+{ maxSize, reps }: rec {
+  inherit proportionsScript;
+  averageProportionsScript = averageProportions;
+  samples                  = makeSamples { inherit maxSize reps; };
+  usageNotes               = ''
+    The 'samples' derivation will build a JSON file of samples, according to the
+    given 'maxSize' and 'reps' arguments.
+
+    The 'proportionsScript' derivation builts a script. This script can be sent
+    the samples JSON on stdin, and it will run all bucketing algorithms on each
+    sample to produce JSON on stdout containing the given samples, annotated
+    with the buckets and ground truths (full and bucketed) for each method.
+
+    The 'averageProportionsScript' derivation builds a script. This script can
+    be sent the output of 'proportionsScript' on stdin, and will produce on
+    stdout some JSON which averages the ground truth proportions.
+  '';
+}
