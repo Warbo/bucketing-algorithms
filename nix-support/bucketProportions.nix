@@ -51,21 +51,19 @@ with rec {
 
   go = samples:
     with {
-      addHashBuckets = samples:
+      addHashBuckets =
         runOn "processed-hashed.json"
               (processSamplesScript {
                 key  = "hashed";
                 prog = benchmarkingCommands.addHashBucketsCmd;
-              })
-              samples;
+              });
 
-      addRecurrentBuckets = samples:
+      addRecurrentBuckets =
         runOn "processed-recurrent.json"
               (processSamplesScript {
                 key  = "recurrent";
                 prog = benchmarkingCommands.addRecurrentBucketsCmd;
-              })
-              samples;
+              });
     };
     rec {
       proportions = runOn "proportions-of"
