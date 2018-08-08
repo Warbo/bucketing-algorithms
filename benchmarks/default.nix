@@ -34,15 +34,27 @@ fixed.mkBin {
                  (if compareVersions nix.version "2" == -1
                      then [ nix-repl ]
                      else []);
-        vars   = withNix { expr = '':p import "${root}/release.nix"''; };
+        vars   = withNix { expr = ''
+          :p import "${root}/release.nix"
+          :q
+        ''; };
         script = ''
           #!/usr/bin/env bash
           set -e
+          # Use nix-repl or nix repl to evaluate $expr
           if command -v nix-repl 1> /dev/null 2> /dev/null
           then
-            echo "$expr" | nix-repl 1>&2
+            O=$(echo "$expr" | nix-repl 2>&1)
           else
-            echo "$expr" | nix repl --show-trace 1>&2
+            O=$(echo "$expr" | nix repl --show-trace 2>&1)
+          fi
+
+          # If evaluation failed, the repl won't exit with an error. The string
+          # 'error:' will probably appear in the output though.
+          if echo "$O" | grep '\Werror:' > /dev/null
+          then
+            echo "$O" 1>&2
+            exit 1
           fi
           exit 0
         '';
