@@ -66,6 +66,7 @@ fixed.mkBin {
             sys.stderr.write('\n'.join(filter(unexpected,
                                               p.stderr.split('\n'))))
 
+          p = None
           try:
             p = subprocess.run(
               ["${measured.benchmarkingCommands.makeDupeSamples}"],
@@ -78,7 +79,7 @@ fixed.mkBin {
               stdout=subprocess.PIPE, stderr=subprocess.PIPE,
               universal_newlines = True)
           except:
-            writeErr(p)
+            if p: writeErr(p)
             raise
           writeErr(p)
           print(p.stdout)
