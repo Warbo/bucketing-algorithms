@@ -19,4 +19,12 @@ def load_command(c):
 
 def run_on(cmd, stdin):
     p = Popen(cmd, stdin=PIPE, stdout=PIPE)
-    return p.communicate(stdin.encode('utf-8'))
+    (output, _) = p.communicate(stdin.encode('utf-8'))
+    assert p.returncode == 0, repr({
+        'error'          : 'Subprocess exited with non-zero return code',
+        'code'           : p.returncode,
+        'cmd'            : cmd,
+        ('stdin'  if len(stdin ) < 300 else 'start of stdin' ):  stdin[0:300],
+        ('stdout' if len(output) < 300 else 'start of stdout'): output[0:300]
+    })
+    return output
