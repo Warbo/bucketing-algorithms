@@ -69,9 +69,13 @@ fixed.mkBin {
           try:
             p = subprocess.run(
               ["${measured.benchmarkingCommands.makeDupeSamples}"],
-              capture_output = True,
-              text           = True,
-              check          = True)
+              check = True,
+
+              # If we were using Python 3.7+ we could do:
+              #   capture_output = True,
+              #   text = True
+              # Since we're not, we have to use the following instead:
+              stdout=PIPE, stderr=PIPE, universal_newlines = True)
           except:
             writeErr(p)
             raise
