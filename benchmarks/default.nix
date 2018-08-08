@@ -46,10 +46,10 @@ fixed.mkBin {
             'Obtained sample'
           ]
 
-          regexen = map(re.compile, [
-            '^Sampling \d* names from a total of \d*$',
-            '^Size \d* rep \d*$'
-          ])
+          regexen = [
+            re.compile('^Sampling \d* names from a total of \d*$'),
+            re.compile('^Size \d* rep \d*$')
+          ]
 
           def unexpected(line):
             """Whether a line of stderr is expected. This lets us filter out
