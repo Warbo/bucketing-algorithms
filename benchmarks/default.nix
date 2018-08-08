@@ -75,7 +75,8 @@ fixed.mkBin {
               #   capture_output = True,
               #   text = True
               # Since we're not, we have to use the following instead:
-              stdout=PIPE, stderr=PIPE, universal_newlines = True)
+              stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+              universal_newlines = True)
           except:
             writeErr(p)
             raise
