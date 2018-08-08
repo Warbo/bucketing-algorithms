@@ -1,6 +1,11 @@
-{ asv, python3Packages, warbo-packages }:
+{ fetchFromGitHub, nix-helpers }:
 
-warbo-packages.asv-nix.override {
-  asv            = asv.override { pythonPackages = python3Packages; };
-  pythonPackages = python3Packages;
-}
+with {
+  src = fetchFromGitHub {
+    owner  = "Warbo";
+    repo   = "asv-nix";
+    rev    = "54d2a89";
+    sha256 = "0hh56xk8z1bzv2v1j2vxmmap8bww8wkjkfqx4cf43jgigalw5miz";
+  };
+};
+import "${src}" { path = nix-helpers.repo1803; }
