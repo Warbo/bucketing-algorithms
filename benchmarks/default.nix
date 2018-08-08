@@ -47,7 +47,7 @@ fixed.mkBin {
           ]
 
           regexen = map(re.compile, [
-            '^Sampling \d* names from a total of \d*$'
+            '^Sampling \d* names from a total of \d*$',
             '^Size \d* rep \d*$'
           ])
 
