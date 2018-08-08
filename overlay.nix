@@ -65,7 +65,7 @@ with rec {
       cabal2nix nix
 
       # Provides subprocess.run and withPackages
-      python python3;
+      python python3 python3Packages;
 
     inherit (self.nix-helpers.override { path = self.nix-helpers.repo1803; })
       # This is defined by nix-helpers, but it must take its dependencies from
