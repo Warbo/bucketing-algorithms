@@ -62,7 +62,10 @@ with rec {
 
     inherit (self.nixpkgs1803)
       # Needed for Nix 2.x daemon tunnel hack
-      cabal2nix nix;
+      cabal2nix nix
+
+      # Provides subprocess.run and withPackages
+      python3;
 
     inherit (self.nix-helpers.override { path = self.nix-helpers.repo1803; })
       # This is defined by nix-helpers, but it must take its dependencies from
