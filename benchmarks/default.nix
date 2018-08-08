@@ -40,9 +40,9 @@ fixed.mkBin {
           set -e
           if command -v nix-repl 1> /dev/null 2> /dev/null
           then
-            echo "$expr" | nix-repl
+            echo "$expr" | nix-repl 1>&2
           else
-            echo "$expr" | nix repl --show-trace
+            echo "$expr" | nix repl --show-trace 1>&2
           fi
         '';
       };
