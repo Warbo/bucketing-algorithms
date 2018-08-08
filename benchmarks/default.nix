@@ -44,6 +44,7 @@ fixed.mkBin {
           else
             echo "$expr" | nix repl --show-trace 1>&2
           fi
+          exit 0
         '';
       };
 
