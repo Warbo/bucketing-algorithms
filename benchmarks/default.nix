@@ -26,6 +26,27 @@ fixed.mkBin {
         addHashBucketsCmd addRecurrentBucketsCmd astsOf dedupeSamples
         getGroundTruths;
 
+      # Evaluates the contents of release.nix, so we can track how slow our Nix
+      # definitions are
+      evaluator = with fixed; wrap {
+        name   = "evaluator";
+        paths  = (withNix {}).buildInputs ++
+                 (if compareVersions nix.version "2" == -1
+                     then [ nix-repl ]
+                     else []);
+        vars   = withNix { expr = '':p import "${root}/release.nix"''; };
+        script = ''
+          #!/usr/bin/env bash
+          set -e
+          if command -v nix-repl 1> /dev/null 2> /dev/null
+          then
+            echo "$expr" | nix-repl
+          else
+            echo "$expr" | nix repl --show-trace
+          fi
+        '';
+      };
+
       # Rather than taking makeDupeSamples directly from benchmarkingCommands,
       # we wrap it with a Python script to avoid spewing info messages to stderr
       # and to set the env vars that are needed to control the sampling.
