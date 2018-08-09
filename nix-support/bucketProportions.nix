@@ -34,6 +34,8 @@ with rec {
         input=dumps(names).encode('utf-8')).decode('utf-8'))
 
       def recurse(path, val):
+        if len(path) == 1:
+          msg('Processing size ' + str(path[0]))
         if val is None:
           return None
         if type(val) == type({}):
