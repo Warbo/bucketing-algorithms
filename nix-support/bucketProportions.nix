@@ -67,18 +67,21 @@ with rec {
   inherit proportionsScript;
   averageProportionsScript = averageProportions;
   samples                  = makeSamples { inherit maxSize reps; };
-  combined                 = writeScript "run-experiment.sh" ''
-    #!/usr/bin/env bash
-    set -e
-    echo "Sampling" 1>&2
-    "${samples}" > samples.json
+  combined                 = wrap {
+    name   = "run-experiment.sh";
+    script = ''
+      #!/usr/bin/env bash
+      set -e
+      echo "Sampling" 1>&2
+      "${samples}" > samples.json
 
-    echo "Bucketing and calculating proportions" 1>&2
-    "${proportionsScript}" < samples.json > proportions.json
+      echo "Bucketing and calculating proportions" 1>&2
+      "${proportionsScript}" < samples.json > proportions.json
 
-    echo "Averaging" 1>&2
-    "${averageProportionsScript}" < proportions.json > averages.json
-  '';
+      echo "Averaging" 1>&2
+      "${averageProportionsScript}" < proportions.json > averages.json
+    '';
+  };
   usageNotes               = ''
     The 'samples' derivation will build a JSON file of samples, according to the
     given 'maxSize' and 'reps' arguments.
