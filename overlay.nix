@@ -50,7 +50,7 @@ with rec {
       nixpkgs1603 nixpkgs1609 nixpkgs1709 nixpkgs1803
 
       # Helper functions, etc.
-      allDrvsIn backtrace composeWithArgs die fail inNixedDir
+      attrsToDirs' allDrvsIn backtrace composeWithArgs die fail inNixedDir
       latestGit mkBin nixListToBashArray nothing pipeToNix repo reverse
       sanitiseName stableHackageDb stripOverrides timeout tryElse
       unlines unpack withDeps wrap;
@@ -129,6 +129,7 @@ fold appendDef
     "makeSamples"
     "nix-helpers"
     "package"
+    "proportionExperiment"
     "recurrentBucket"
     "runCabal2nix"
     "runOn"
