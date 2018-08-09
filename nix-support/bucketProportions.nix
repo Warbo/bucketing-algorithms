@@ -72,11 +72,8 @@ with rec {
     script = ''
       #!/usr/bin/env bash
       set -e
-      echo "Sampling" 1>&2
-      "${samples}" > samples.json
-
       echo "Bucketing and calculating proportions" 1>&2
-      "${proportionsScript}" < samples.json > proportions.json
+      "${proportionsScript}" < "${samples}" > proportions.json
 
       echo "Averaging" 1>&2
       "${averageProportionsScript}" < proportions.json > averages.json
