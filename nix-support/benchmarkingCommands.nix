@@ -46,7 +46,8 @@ rec {
 
       "${astsOf}" > "$FILENAME"
 
-      parallel "$pre $FILENAME $post" ::: $(seq 1 20) | jq -s 'add'
+      parallel --halt now,fail=1 -j 20 \
+        "$pre $FILENAME $post" ::: $(seq 1 20) | jq -s 'add'
     '';
   };
 
