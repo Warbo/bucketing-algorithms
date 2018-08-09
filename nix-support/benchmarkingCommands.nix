@@ -22,10 +22,10 @@ rec {
     paths  = [ bash dep jq parallel ];
     vars   = {
       # Required for Perl
-      LANGUAGE = "en_US.UTF-8";
-      LC_ALL   = "en_US.UTF-8";
-      LANG     = "en_US.UTF-8";
-      LC_TYPE  = "en_US.UTF-8";
+      LANGUAGE = "C";
+      LC_ALL   = "C";
+      LANG     = "C";
+      LC_TYPE  = "C";
 
       # The string '{}' will be replaced by parallel with the size. The path to
       # the ASTs is dynamic, so we add it in between these two.
