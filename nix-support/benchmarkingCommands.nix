@@ -7,54 +7,53 @@
 #  - The impact of the bucketing algorithms is measured, on lots of test data
 #  - The speed of the scripts is measured on small inputs, to aid us in
 #    optimising their implementation (since the above can be very slow!)
-{ bash, callPackage, hashBucket, jq, lib, recurrentBucket, wrap }:
+{ bash, callPackage, hashBucket, jq, lib, parallel, recurrentBucket, wrap }:
 
 with builtins;
 rec {
   astsOf = callPackage ./astsOf.nix {};
 
-  # Run the bucket script on each sample; we use a few bucket sizes, in
-  # increments
-  addHashBucketsCmd = wrap {
-    name  = "hash";
-    paths = [ hashBucket jq ];
-    vars  = {
-      inherit astsOf;
-      sizes = concatStringsSep " " (map toString (lib.range 1 20));
+  # Runs a bucketing script on samples from stdin. We use a few bucket sizes for
+  # comparison. Since each bucket size is independent we use GNU Parallel to run
+  # them concurrently; this ensures the outputs don't overlap, so 'jq' can
+  # combine them correctly.
+  skeleton = { cmd, dep, name }: wrap {
+    inherit name;
+    paths  = [ bash dep jq parallel ];
+    vars   = {
+      # The string '{}' will be replaced by parallel with the size. The path to
+      # the ASTs is dynamic, so we add it in between these two.
+      pre  = ''export CLUSTER_SIZE={}; "${cmd}" < '';
+      post = '' | jq '{"{}" : map(map(.name))}'
+      '';
     };
     script = ''
       #!/usr/bin/env bash
       set -e
-      ASTS=$("$astsOf")
 
-      for CLUSTER_SIZE in $sizes
-      do
-        export CLUSTER_SIZE
-        echo "$ASTS" | hashBucket |
-          jq '{(env["CLUSTER_SIZE"]) : map(map(.name))}'
-      done | jq -s 'add'
+      # Store ASTs in /dev/shm so they're kept in memory
+      FILENAME="/dev/shm/bucketing-$$-$RANDOM"
+      function cleanUp {
+        rm -f "$FILENAME"
+      }
+      trap cleanUp EXIT
+
+      "${astsOf}" > "$FILENAME"
+
+      parallel "$pre $FILENAME $post" ::: $(seq 1 20) | jq -s 'add'
     '';
   };
 
-  addRecurrentBucketsCmd = wrap {
-    name  = "recurrent";
-    paths = [ recurrentBucket jq ];
-    vars  = {
-      inherit astsOf;
-      sizes = concatStringsSep " " (map toString (lib.range 1 20));
-    };
-    script = ''
-      #!/usr/bin/env bash
-      set -e
-      ASTS=$("$astsOf")
+  addHashBucketsCmd = skeleton {
+    name = "hash";
+    cmd  = "hashBucket";
+    dep  = hashBucket;
+  };
 
-      for CLUSTER_SIZE in $sizes
-      do
-        export CLUSTER_SIZE
-        echo "$ASTS" | recurrentBucket |
-          jq '{(env["CLUSTER_SIZE"]) : map(map(.name))}'
-      done | jq -s 'add'
-    '';
+  addRecurrentBucketsCmd = skeleton {
+    name = "recurrent";
+    cmd  = "recurrentBucket";
+    dep  = recurrentBucket;
   };
 
   makeDupeSamples = callPackage ./makeDupeSamples.nix {};
