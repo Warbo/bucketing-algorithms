@@ -36,4 +36,7 @@ with rec {
             results."withRecurrentHashedGroundTruthsProportions.json";
   };
 };
-attrsToDirs' "proportion-experiment-results" results
+{
+  steps   = results;
+  results = attrsToDirs' "proportion-experiment-results" results;
+}
