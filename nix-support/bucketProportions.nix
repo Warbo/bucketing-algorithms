@@ -1,11 +1,11 @@
-# Choose a bunch of samples, bucket them in a variety of ways and measure the
+# Scripts for bucketing samples in a variety of ways and measure the
 # proportion of ground truth theorems which apply to the resulting buckets.
 #
 # Write output to JSON for archiving.
 { averageProportions, benchmarkingCommands, calculateProportions, composeBins,
-  jq, lib, makeSamples, python3, runCommand, runOn, tebenchmark, wrap }:
-with { inherit (builtins) concatStringsSep map; };
+  jq, lib, python3, runCommand, runOn, tebenchmark, wrap }:
 
+with { inherit (builtins) concatStringsSep map; };
 with rec {
   # Runs each sample through the stdio of a given program, adding the result to
   # the samples JSON. Useful for running a bucketing script on each sample.
@@ -49,50 +49,19 @@ with rec {
     '';
   };
 
-  proportionsScript = composeBins "proportions-script" [
-    (processSamplesScript {
-      key  = "recurrent";
-      prog = benchmarkingCommands.addRecurrentBucketsCmd;
-    })
-      (processSamplesScript {
-      key  = "hashed";
-      prog = benchmarkingCommands.addHashBucketsCmd;
-    })
-    benchmarkingCommands.getGroundTruths
-    calculateProportions
-  ];
+  addRecurrent = processSamplesScript {
+    key  = "recurrent";
+    prog = benchmarkingCommands.addRecurrentBucketsCmd;
+  };
+
+  addHashed = processSamplesScript {
+    key  = "hashed";
+    prog = benchmarkingCommands.addHashBucketsCmd;
+  };
 };
 
-{ maxSize, reps }: rec {
-  inherit proportionsScript;
-  averageProportionsScript = averageProportions;
-  samples                  = makeSamples { inherit maxSize reps; };
-  combined                 = wrap {
-    name   = "run-experiment.sh";
-    script = ''
-      #!/usr/bin/env bash
-      set -e
-      echo "Bucketing and calculating proportions" 1>&2
-      "${proportionsScript}" < "${samples}" > proportions.json
-
-      echo "Averaging" 1>&2
-      "${averageProportionsScript}" < proportions.json > averages.json
-    '';
-  };
-  usageNotes               = ''
-    The 'samples' derivation will build a JSON file of samples, according to the
-    given 'maxSize' and 'reps' arguments.
-
-    The 'proportionsScript' derivation builts a script. This script can be sent
-    the samples JSON on stdin, and it will run all bucketing algorithms on each
-    sample to produce JSON on stdout containing the given samples, annotated
-    with the buckets and ground truths (full and bucketed) for each method.
-
-    The 'averageProportionsScript' derivation builds a script. This script can
-    be sent the output of 'proportionsScript' on stdin, and will produce on
-    stdout some JSON which averages the ground truth proportions.
-
-    The 'combined' script will run all of the above. Note that it will generate
-    files in the current working directory.
-  '';
+rec {
+  inherit addRecurrent addHashed averageProportions calculateProportions
+          combinedScript;
+  inherit (benchmarkingCommands) getGroundTruths;
 }
