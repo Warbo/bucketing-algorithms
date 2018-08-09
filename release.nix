@@ -2,6 +2,5 @@
 # Imports those useful derivations from default.nix, like user-facing packages,
 # tests, benchmarks, etc.
 {
-  inherit (import ./.)
-    benchmark package performanceScript;
+  inherit (import ./.) benchmark package;
 }
