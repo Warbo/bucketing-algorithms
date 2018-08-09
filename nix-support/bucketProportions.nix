@@ -15,11 +15,11 @@ with rec {
     vars   = { inherit key prog; LANG = "en_US.UTF-8"; };
     script = ''
       #!/usr/bin/env python3
-      from io         import StringIO
       from json       import dumps, loads
       from os         import getenv
-      from subprocess import check_output
+      from subprocess import PIPE, Popen
       from sys        import stderr, stdin
+      from time       import sleep
 
       msg  = lambda x: (stderr.write((x if type(x) == type("") \
                                         else repr(x)) + '\n'),
@@ -29,27 +29,88 @@ with rec {
 
       key, prog = map(getenv, ['key', 'prog'])
 
-      process = lambda names: loads(check_output(
-        [prog],
-        input=dumps(names).encode('utf-8')).decode('utf-8'))
+      def setIn(path, want, val):
+        assert path != [], "Can't set empty path"
 
-      done = []
+        if len(path) == 1:
+          val[path[0]] = want
+          return val
+
+        if path[0] not in val:
+          val[path[0]] = {}
+
+        returnsetIn(path[1:], want, val[path[0]])
+
+      jobs = []
 
       def recurse(path, val):
-        if len(path) == 1:
-          done.append(path[0])
-          msg(str(len(done)) + '/' + str(len(data)))
+        """Recurses through JSON structure, finding samples to bucket and noting
+        the paths that we need to write the results to."""
         if val is None:
           return None
         if type(val) == type({}):
           if 'sample' in val:
-            return dict(val, **{key: process(val['sample'])})
+            jobs.append({
+              'path'  : path + [key],
+              'input' : val['sample'],
+            })
           return {k: recurse(path + [k], val[k]) for k in sort(val)}
         return val
 
+      # Load the given set of samples
       data = loads(stdin.read())
 
-      print(dumps(recurse([], data)))
+      # Get data for all of the subprocesses we need to run
+      recurse([], data)
+
+      # Run 'jobs' via a pool of concurrent subprocesses
+      total    = len(jobs)
+      running  = []
+      limit    = 20
+      reported = 0  # The last value we reported to the user
+      while jobs or running:
+        # Output some progress information
+        current = len(jobs) + len(running)
+        if current != reported:
+          msg(str(total - current) + '/' + str(total))
+          reported = current
+
+        # Try to fill up 'running', if there are any remaining jobs
+        while (len(running) < limit) and jobs:
+          details = jobs.pop(0)
+          proc    = Popen([prog], stdin=PIPE, stdout=PIPE)
+          proc.stdin.write(dumps(details['input']).encode('utf-8'))
+          running.append({
+            'proc' : proc,
+            'path' : details['path'],
+            'done' : False
+          })
+
+        # Look for finished processes, and update 'data' accordingly
+        someDone = False
+        for run in running:
+          proc = run['proc']
+          if proc.poll() is None:
+            continue
+
+          assert proc.returncode == 0, repr({
+            'error': 'Subprocess gave non-zero return code',
+            'code' : proc.returncode
+          })
+
+          someDone    = True
+          run['done'] = True
+          setIn(proc['path'], loads(proc.stdout.read().decode('utf-8')), data)
+
+        # Now drop those finished jobs that we processed (we don't poll again,
+        # since that would be a race condition)
+        if someDone:
+          running = list(filter(lambda run: not run['done'], running))
+
+        # Wait a little, since this is a busy-loop
+        sleep(0.1)
+
+      print(dumps(data))
     '';
   };
 
