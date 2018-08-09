@@ -21,7 +21,9 @@ with rec {
       from subprocess import check_output
       from sys        import stderr, stdin
 
-      msg  = lambda x: stderr.write(repr(x) + '\n')
+      msg  = lambda x: (stderr.write((x if type(x) == type("") \
+                                        else repr(x)) + '\n'),
+                        stderr.flush())
 
       sort = lambda collection: sorted([elem for elem in collection])
 
