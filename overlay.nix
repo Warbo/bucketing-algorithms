@@ -55,11 +55,15 @@ with rec {
       sanitiseName stableHackageDb stripOverrides timeout tryElse
       unlines unpack withDeps wrap;
 
+    # Unavoidable impurity
+    inherit (import <nixpkgs> {})
+      nix;
+
     # Fixed versions to avoid known breakages
 
     inherit (self.nixpkgs1803)
       # Needed for Nix 2.x daemon tunnel hack
-      cabal2nix nix
+      cabal2nix
 
       # Provides subprocess.run and withPackages
       python python3 python3Packages;
