@@ -124,6 +124,7 @@ fold appendDef
     "benchmarkingCommands"
     "bucketCheck"
     "bucketProportions"
+    "bucketRunner"
     "calculateProportions"
     "composeBins"
     "ghcWithML4HSFE"
