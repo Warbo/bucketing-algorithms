@@ -121,7 +121,6 @@ fold appendDef
     "bucketCheck"
     "bucketProportions"
     "calculateProportions"
-    "callHackage"
     "composeBins"
     "ghcWithML4HSFE"
     "hashBucket"
