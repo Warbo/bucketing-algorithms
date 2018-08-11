@@ -26,6 +26,8 @@ bucket c asts = map (map convert) processed
                       A.Error err -> error err
                       A.Success x -> x
 
+bucketer = (Method "recurrent", bucket)
+
 processAsts = H.elems . V.foldl' acc H.empty
   where acc h v = case v of
                     A.Object o -> ins h o

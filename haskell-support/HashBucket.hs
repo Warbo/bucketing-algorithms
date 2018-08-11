@@ -74,3 +74,5 @@ render = go (go (A.encode . getAST) (Just keeper)) Nothing
                  BL.intercalate ",\n" .
                  map f                .
                  maybe id filter p
+
+bucketer = (Method "hash", bucket)
