@@ -10,8 +10,9 @@
 { bash, callPackage, hashBucket, jq, lib, parallel, recurrentBucket, wrap }:
 
 with builtins;
+with callPackage ./astsOf.nix {};
 rec {
-  astsOf = callPackage ./astsOf.nix {};
+  astsOf = astsOfScript;
 
   # Runs a bucketing script on samples from stdin. We use a few bucket sizes for
   # comparison. Since each bucket size is independent we use GNU Parallel to run
