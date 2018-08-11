@@ -6,8 +6,10 @@ import qualified Data.Aeson          as A
 import qualified Data.HashMap.Strict as HM
 import qualified Data.Text           as T
 
+newtype Name = Name { unName :: T.Text }
+
 data AST = AST {
-  getName :: T.Text,
+  getName :: Name,
   getAST  :: A.Object,
   keeper  :: Bool
 }
