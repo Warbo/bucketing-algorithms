@@ -19,18 +19,6 @@
       import           System.IO.Unsafe           (unsafePerformIO)
       import qualified ${mod}
 
-      clusters :: [a] -> Int
-      clusters asts = fromJust (fromSize <|> fromEnv <|> Just fromIn)
-        where fromSize = case (unsafePerformIO (lookupEnv "CLUSTER_SIZE")) of
-                           Nothing -> Nothing
-                           Just s  -> let size = fromIntegral (read s :: Int)
-                                          len  = fromIntegral inCount :: Float
-                                       in Just (ceil (len / size))
-              fromEnv = fmap read (unsafePerformIO (lookupEnv "CLUSTERS"))
-              fromIn  = ceil (sqrt (fromIntegral inCount))
-              inCount = length asts
-              ceil    = ceiling :: Float -> Int
-
       main = do i <- LBS.getContents
                 if LBS.all C.isSpace i
                    then LBS.putStr "[]"

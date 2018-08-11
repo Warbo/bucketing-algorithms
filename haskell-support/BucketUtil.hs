@@ -30,3 +30,17 @@ instance A.FromJSON AST where
                      _                   -> False
     })
   parseJSON _ = mzero
+
+-- Gets number of clusters to use, taking
+clusters :: [a] -> Int
+clusters asts = fromJust (fromSize <|> fromEnv <|> Just fromIn)
+  where fromSize = case (unsafePerformIO (lookupEnv "CLUSTER_SIZE")) of
+                     Nothing -> Nothing
+                     Just s  -> let size = fromIntegral (read s :: Int)
+                                    len  = fromIntegral inCount :: Float
+                                 in Just (ceil (len / size))
+        fromEnv = fmap read (unsafePerformIO (lookupEnv "CLUSTERS"))
+        fromIn  = ceil (sqrt (fromIntegral inCount))
+        inCount = length asts
+        ceil    = ceiling :: Float -> Int
+
