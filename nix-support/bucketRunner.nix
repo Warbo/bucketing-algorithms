@@ -9,6 +9,7 @@
     main  = writeScript "${name}-main.hs" ''
       {-# LANGUAGE OverloadedStrings #-}
       module Main where
+      import           BucketUtil
       import           Control.Applicative        ((<|>))
       import qualified Data.Aeson                 as A
       import qualified Data.ByteString.Char8      as BS

@@ -48,7 +48,7 @@ pickBucket clusters x = (cluster, x { getAST  = ast' })
         ast     = getAST  x
         ast'    = HM.insert "cluster" (A.Number (1 + cluster)) ast
         num     = bsToInteger hash
-        hash    = convert (H.hashWith H.SHA256 (TE.encodeUtf8 name))
+        hash    = convert (H.hashWith H.SHA256 (TE.encodeUtf8 (unName name)))
 
 bsToInteger :: BS.ByteString -> Integer
 bsToInteger = BS.foldl appendByte 0

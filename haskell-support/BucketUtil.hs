@@ -1,12 +1,26 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 module BucketUtil where
 
+import           Control.Applicative ((<|>))
 import           Control.Monad       (mzero)
 import qualified Data.Aeson          as A
 import qualified Data.HashMap.Strict as HM
+import qualified Data.Map.Strict     as Map
+import           Data.Maybe          (fromJust)
+import qualified Data.String         as S
 import qualified Data.Text           as T
+import           System.Environment  (lookupEnv)
+import           System.IO.Unsafe    (unsafePerformIO)
 
 newtype Name = Name { unName :: T.Text }
+
+instance A.FromJSON Name where
+  parseJSON j = Name <$> A.parseJSON j
+
+instance A.ToJSON Name where
+  toJSON (Name n) = A.toJSON n
 
 data AST = AST {
   getName :: Name,
@@ -44,41 +58,44 @@ clusters asts = fromJust (fromSize <|> fromEnv <|> Just fromIn)
         inCount = length asts
         ceil    = ceiling :: Float -> Int
 
-newtype Method = Method String
+newtype Method = Method T.Text deriving (Eq, Ord)
 
 type Bucketer = (Method, Maybe Int -> [AST] -> [[AST]])
 
-type Bucketed = HM.HashMap Method (HM.HashMap Int [[Name]])
+type Bucketed = Map.Map Method (Map.Map Int [[Name]])
 
 bucketSizes :: [Int] -> [AST] -> Bucketer -> Bucketed
-bucketSizes sizes asts (method, bucket) = HM.singleton method results
-  where results = fromList (map go sizes)
+bucketSizes sizes asts (method, bucket) = Map.singleton method results
+  where results = Map.fromList (map go sizes)
         go size = (size, map (map getName) (bucket (Just size) asts))
 
 -- For aggregated samples
 
-newtype Sizes = Sizes (HM.HashMap Int -> Size)
+toJSON' m = let convert (k, v) = T.pack (show k) A..= v
+             in A.object (map convert (Map.toList m))
 
-newtype Size  = Size  (HM.HashMap Int -> Maybe Rep)
+newtype Sizes = Sizes (Map.Map Int Size)
 
-newtype Rep   = Rep { sample :: [Name], bucketed :: Bucketed }
+newtype Size  = Size  (Map.Map Int (Maybe Rep))
+
+data    Rep   = Rep { sample :: [Name], bucketed :: Bucketed }
 
 instance A.ToJSON Rep where
   toJSON (Rep sample bucketed) =
-    let meth (Method m, bucketed) = m .= object (map size (HM.toList bucketed))
-        size (i, names)           = T.pack (show i) .= map (map unName) names
-     in A.object (("sample" .= sample):map meth (HM.toList bucketed))
+    let meth (Method m, bucketed) = m A..= A.object (map size (Map.toList bucketed))
+        size (i, names)           = T.pack (show i) A..= map (map unName) names
+     in A.object (("sample" A..= sample):map meth (Map.toList bucketed))
 
 instance A.ToJSON Size where
-  toJSON (Size m) = A.toJSON m
+  toJSON (Size m) = toJSON' m
 
 instance A.ToJSON Sizes where
-  toJSON (Sizes m) = A.toJSON m
+  toJSON (Sizes m) = toJSON' m
 
 bucketAll :: [Bucketer] -> ([Name] -> [AST]) -> Sizes -> Sizes
-bucketAll brs astsOf (Sizes ss) = Sizes (HM.map goSize ss)
-  where goSize (Size s) = Size (HM.map goRep s)
+bucketAll brs astsOf (Sizes ss) = Sizes (Map.map goSize ss)
+  where goSize (Size s) = Size (Map.map goRep s)
         goRep r = case r of
           Nothing         -> Nothing
-          Just (Rep s bs) -> Just (Rep s (HM.unions (bs:map (bucket s) brs)))
+          Just (Rep s bs) -> Just (Rep s (Map.unions (bs:map (bucket s) brs)))
         bucket sample = bucketSizes [1..20] (astsOf sample)
