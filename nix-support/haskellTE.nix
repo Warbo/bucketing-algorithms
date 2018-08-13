@@ -1,19 +1,14 @@
 # Useful for ASTs, etc.
-{ latestGit, nix, nix-helpers }:
+{ latestGit, nix-helpers }:
 
 with {
   src = latestGit {
     url    = "https://github.com/Warbo/haskell-te.git";
     stable = {
-      rev        = "c68e6fd";
-      sha256     = "14ji8kzk6z477kq8vf633iqm57v1z9byz630mmq51ppikvgjmisi";
+      rev        = "5e98338";
+      sha256     = "1wlm17kkhblmq7d9yzfmqs4n9qilw8bxmyznv4lbqh2rl3311l5w";
       unsafeSkip = false;
     };
   };
 };
-import nix-helpers.repo1803 {
-  overlays = [
-    (import "${src}/overlay.nix")
-    (self: super: { inherit nix; })
-  ];
-}
+import nix-helpers.repo1803 { overlays = [ (import "${src}/overlay.nix") ]; }
