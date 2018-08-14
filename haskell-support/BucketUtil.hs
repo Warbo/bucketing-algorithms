@@ -86,6 +86,9 @@ entries = map snd . Map.toList
 toJSON' m = let convert (k, v) = T.pack (show k) A..= v
              in A.object (map convert (Map.toList m))
 
+parseJSON' hm = let convert (k, v) = (read (T.unpack k),) <$> A.parseJSON v
+                 in mapM convert (HM.toList hm)
+
 newtype Sizes = Sizes (Map.Map Int Size)
 
 newtype Size  = Size  (Map.Map Int (Maybe Rep))
@@ -104,8 +107,8 @@ instance A.FromJSON Rep where
         sample   = snd . head . filter ((== "sample") . fst) $ vals
         bucketed = filter ((/= "sample") . fst) $ vals
     sample'   <- A.parseJSON sample
-    bucketed' <- mapM (\(a, b) -> (Method a,) <$> A.parseJSON b) bucketed
-    pure (Rep sample' (Map.fromList bucketed'))
+    bucketed' <- parseJSON' (HM.fromList bucketed)
+    pure (Rep sample' (Map.fromList (map (\(m, b) -> (Method m, b)) bucketed')))
 
 instance A.ToJSON Size where
   toJSON (Size m) = toJSON' m
@@ -127,7 +130,8 @@ instance A.ToJSON Sizes where
   toJSON (Sizes m) = toJSON' m
 
 instance A.FromJSON Sizes where
-  parseJSON j = Sizes <$> A.parseJSON j
+  parseJSON (A.Object hm) = Sizes . Map.fromList <$> parseJSON' hm
+  parseJSON _ = mzero
 
 bucketAll :: [Bucketer] -> ([Name] -> [AST]) -> Sizes -> Sizes
 bucketAll brs astsOf (Sizes ss) = Sizes (Map.map goSize ss)
