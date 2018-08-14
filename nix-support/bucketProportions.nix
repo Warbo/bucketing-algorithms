@@ -2,69 +2,55 @@
 # proportion of ground truth theorems which apply to the resulting buckets.
 #
 # Write output to JSON for archiving.
-{ averageProportions, benchmarkingCommands, calculateProportions, composeBins,
-  jq, lib, python3, runCommand, runOn, tebenchmark, wrap }:
+{ attrsToDirs', averageProportions, benchmarkingCommands, calculateProportions,
+  callPackage, ghcWithML4HSFE, runCommand, wrap, writeScript }:
 
 with { inherit (builtins) concatStringsSep map; };
+with callPackage ./astsOf.nix {};
 with rec {
-  # Runs each sample through the stdio of a given program, adding the result to
-  # the samples JSON. Useful for running a bucketing script on each sample.
-  processSamplesScript = { key, prog }: wrap {
-    name   = "process-samples.py";
-    paths  = [ (python3.withPackages (p: [])) ];
-    vars   = { inherit key prog; LANG = "en_US.UTF-8"; };
-    script = ''
-      #!/usr/bin/env python3
-      from json       import dumps, loads
-      from os         import getenv
-      from subprocess import check_output
-      from sys        import stderr, stdin
+  # Runs each sample through all bucketers, adding the result to the samples
+  # JSON
+  addBuckets = wrap {
+    name  = "process-samples";
+    vars  = { LANG = "en_US.UTF-8"; };
+    file  = runCommand "process-samples-script"
+      {
+        buildInputs = [ ghcWithML4HSFE ];
+        mods        = attrsToDirs' "bucket-proportions-mods" (astsOfModules // {
+          "BucketUtil.hs"      = ../haskell-support/BucketUtil.hs;
+          "HashBucket.hs"      = ../haskell-support/HashBucket.hs;
+          "RecurrentBucket.hs" = ../haskell-support/RecurrentBucket.hs;
+          "Main.hs"            = writeScript "process-samples-main.hs" ''
+            module Main where
 
-      msg  = lambda x: (stderr.write((x if type(x) == type("") \
-                                        else repr(x)) + '\n'),
-                        stderr.flush())
+            import qualified Data.Aeson as A
+            import qualified BucketUtil
+            import qualified HashBucket
+            import qualified RecurrentBucket
 
-      sort = lambda collection: sorted([elem for elem in collection])
+            bucketers = [HashBucket.bucketer, RecurrentBucket.bucketer]
 
-      key, prog = map(getenv, ['key', 'prog'])
+            go = BucketUtil.bucketAll bucketers
+                                      (BucketUtil.astsOf AstsOf.astsOf')
 
-      process = lambda names: loads(check_output(
-        [prog],
-        input=dumps(names).encode('utf-8')).decode('utf-8'))
-
-      done = []
-
-      def recurse(path, val):
-        if len(path) == 1:
-          done.append(path[0])
-          msg(str(len(done)) + '/' + str(len(data)))
-        if val is None:
-          return None
-        if type(val) == type({}):
-          if 'sample' in val:
-            return dict(val, **{key: process(val['sample'])})
-          return {k: recurse(path + [k], val[k]) for k in sort(val)}
-        return val
-
-      data = loads(stdin.read())
-
-      print(dumps(recurse([], data)))
-    '';
-  };
-
-  addRecurrent = processSamplesScript {
-    key  = "recurrent";
-    prog = benchmarkingCommands.addRecurrentBucketsCmd;
-  };
-
-  addHashed = processSamplesScript {
-    key  = "hashed";
-    prog = benchmarkingCommands.addHashBucketsCmd;
+            main = do
+              i <- LBS.getContents
+              case A.eitherDecode i of
+                Left err -> error err
+                Right ss -> LBS.putStr (A.encode (go ss))
+          '';
+        });
+      }
+      ''
+        cp -rv "$mods" mods
+        chmod +w -R mods
+        cd mods
+        ghc --make -o "$out" Main.hs
+      '';
   };
 };
 
 rec {
-  inherit addRecurrent addHashed averageProportions calculateProportions
-          combinedScript;
+  inherit addBuckets averageProportions calculateProportions;
   inherit (benchmarkingCommands) getGroundTruths;
 }

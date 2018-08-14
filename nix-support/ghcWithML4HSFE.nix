@@ -65,6 +65,8 @@ with rec {
     hs.aeson
     hs.bytestring
     hs.containers
+    hs.cryptonite
+    hs.memory
     hs.ML4HSFE
     hs.process
     hs.process-extras

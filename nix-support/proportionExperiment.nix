@@ -10,30 +10,25 @@ with rec {
       reps    = 100;
     };
 
-    "withRecurrent.json" =
-      runOn "with-recurrent-buckets"
-            addRecurrent
+    "withBuckets.json" =
+      runOn "with-buckets"
+            addBuckets
             results."samples.json";
 
-    "withRecurrentHashed.json" =
-      runOn "with-hash-buckets"
-            addHashed
-            results."withRecurrent.json";
-
-    "withRecurrentHashedGroundTruths.json" =
+    "withBucketsGroundTruths.json" =
       runOn "with-ground-truths"
             getGroundTruths
-            results."withRecurrentHashed.json";
+            results."withBuckets.json";
 
-    "withRecurrentHashedGroundTruthsProportions.json" =
+    "withBucketsGroundTruthsProportions.json" =
       runOn "with-proportions"
             calculateProportions
-            results."withRecurrentHashedGroundTruths.json";
+            results."withBucketsGroundTruths.json";
 
-    "averageRecurrentHashed.json" =
+    "averageBucketProportions.json" =
       runOn "with-averages"
             averageProportions
-            results."withRecurrentHashedGroundTruthsProportions.json";
+            results."withBucketsGroundTruthsProportions.json";
   };
 };
 {
