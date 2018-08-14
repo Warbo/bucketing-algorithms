@@ -49,8 +49,9 @@ with rec {
                           Right xs -> xs
     '';
     "AstsOf.hs" = writeScript "AstsOf.hs" ''
-      {-# LANGUAGE OverloadedStrings #-}
-      {-# LANGUAGE TemplateHaskell   #-}
+      {-# LANGUAGE OverloadedStrings     #-}
+      {-# LANGUAGE PartialTypeSignatures #-}
+      {-# LANGUAGE TemplateHaskell       #-}
       module AstsOf where
       import qualified Data.Aeson                 as Aeson
       import qualified Data.ByteString.Lazy.Char8 as BS
@@ -72,7 +73,7 @@ with rec {
 
       -- Parse, lookup, print
 
-      astsOf :: _
+      --astsOf :: [Name] -> [AST]
       astsOf = map get
         where get n        = Map.findWithDefault (err n) n astMap
               err (Name n) = error ("No AST for " ++ show n)
