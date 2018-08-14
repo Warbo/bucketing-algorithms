@@ -8,14 +8,14 @@
 #  - The speed of the scripts is measured on small inputs, to aid us in
 #    optimising their implementation (since the above can be very slow!)
 { attrsToDirs', bash, callPackage, ghcWithML4HSFE, haskellPackages, jq, lib,
-  mkBin, runCommand, wrap, writeScript }:
+  runCommand, wrap, writeScript }:
 
 with builtins;
 with callPackage ./astsOf.nix {};
 rec {
   astsOf = astsOfScript;
 
-  cmdSkeleton = { buildInputs, mod, name }: mkBin {
+  cmdSkeleton = { buildInputs, mod, name }: wrap {
     inherit name;
     file = runCommand "${name}-compiled"
       {
