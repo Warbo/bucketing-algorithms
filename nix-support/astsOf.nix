@@ -78,6 +78,8 @@ with rec {
         where get n        = Map.findWithDefault (err n) n astMap
               err (Name n) = error ("No AST for " ++ show n)
 
+      astsOf' = map unAST . astsOf . map Name
+
       namesToAsts :: BS.ByteString -> BS.ByteString
       namesToAsts s = case Aeson.eitherDecode s of
         Left err -> error err
