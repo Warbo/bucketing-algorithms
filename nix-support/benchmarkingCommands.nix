@@ -7,43 +7,60 @@
 #  - The impact of the bucketing algorithms is measured, on lots of test data
 #  - The speed of the scripts is measured on small inputs, to aid us in
 #    optimising their implementation (since the above can be very slow!)
-{ bash, callPackage, hashBucket, jq, lib, parallel, recurrentBucket, wrap }:
+{ attrsToDirs', bash, callPackage, ghcWithML4HSFE, haskellPackages, jq, lib,
+  mkBin, runCommand, wrap, writeScript }:
 
 with builtins;
 with callPackage ./astsOf.nix {};
 rec {
   astsOf = astsOfScript;
 
-  # Runs a bucketing script on samples from stdin. We use a few bucket sizes for
-  # comparison. Since each bucket size is independent we use GNU Parallel to run
-  # them concurrently; this ensures the outputs don't overlap, so 'jq' can
-  # combine them correctly.
-  skeleton = { cmd, dep, name }: wrap {
+  cmdSkeleton = { buildInputs, mod, name }: mkBin {
     inherit name;
-    paths  = [ bash dep jq parallel ];
-    vars   = {
-      # Required for Perl
-      LANGUAGE = "C";
-      LC_ALL   = "C";
-      LANG     = "C";
-      LC_TYPE  = "C";
+    file = runCommand "${name}-compiled"
+      {
+        inherit buildInputs;
+        main  = writeScript "${name}-main.hs" ''
+          module Main where
 
-      # The string '{}' will be replaced by parallel with the size. The path to
-      # the ASTs is dynamic, so we add it in between these two.
-      pre  = ''export CLUSTER_SIZE={}; "${cmd}" < '';
-      post = '' | jq '{"{}" : map(map(.name))}'
-      '';
-    };
-    script = ''
-      #!/usr/bin/env bash
-      set -e
+          import qualified AstsOf
+          import qualified BucketUtil
+          import qualified Data.Aeson                 as A
+          import qualified Data.ByteString.Lazy.Char8 as LBS
+          import qualified Data.Text.Lazy             as T
+          import qualified Data.Text.Lazy.Encoding    as TE
+          import qualified ${mod}
 
-      # Store ASTs in /dev/shm so they're kept in memory
-      FILENAME="/dev/shm/bucketing-$$-$RANDOM"
-      function cleanUp {
-        rm -f "$FILENAME"
+          astsOf :: [BucketUtil.Name] -> [BucketUtil.AST]
+          astsOf =  map convert       .
+                    AstsOf.astsOf'    .
+                    map (T.fromStrict . BucketUtil.unName)
+            where convert a = case A.eitherDecode (TE.encodeUtf8 a) of
+                                Left err -> error err
+                                Right x  -> x
+
+          main = do
+            i <- LBS.getContents
+            let names = case A.eitherDecode i of
+                  Left err -> error err
+                  Right ns -> ns
+                asts     = astsOf names
+                bucketed = BucketUtil.bucketSizes [1..20] asts ${mod}.bucketer
+                entries  = BucketUtil.entries bucketed
+            LBS.putStr (A.encode (BucketUtil.toJSON' (head entries)))
+        '';
       }
-      trap cleanUp EXIT
+      ''
+        cp -v "${attrsToDirs' "asts-of-mods" astsOfModules}"/* ./
+        cp -v "${attrsToDirs' "bucketing-mods" {
+          "BucketUtil.hs" = ../haskell-support/BucketUtil.hs;
+          "HashBucket.hs" = ../haskell-support/HashBucket.hs;
+          "RecurrentBucket.hs" = ../haskell-support/RecurrentBucket.hs;
+        }}"/* ./
+        cp -v "$main" Main.hs
+        ghc --make -o "$out" Main.hs
+      '';
+  };
 
       "${astsOf}" > "$FILENAME"
 
@@ -52,16 +69,19 @@ rec {
     '';
   };
 
-  addHashBucketsCmd = skeleton {
-    name = "hash";
-    cmd  = "hashBucket";
-    dep  = hashBucket;
+  addHashBucketsCmd = cmdSkeleton {
+    buildInputs = [ (haskellPackages.ghcWithPackages (h: [
+      h.aeson h.bytestring h.containers h.cryptonite h.memory h.text
+      h.th-lift-instances h.unordered-containers
+    ])) ];
+    mod         = "HashBucket";
+    name        = "hash";
   };
 
-  addRecurrentBucketsCmd = skeleton {
-    name = "recurrent";
-    cmd  = "recurrentBucket";
-    dep  = recurrentBucket;
+  addRecurrentBucketsCmd = cmdSkeleton {
+    buildInputs = [ ghcWithML4HSFE ];
+    mod         = "RecurrentBucket";
+    name        = "recurrent";
   };
 
   makeDupeSamples = callPackage ./makeDupeSamples.nix {};
