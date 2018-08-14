@@ -3,16 +3,18 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 module BucketUtil where
 
-import           Control.Applicative ((<|>))
-import           Control.Monad       (mzero)
-import qualified Data.Aeson          as A
-import qualified Data.HashMap.Strict as HM
-import qualified Data.Map.Strict     as Map
-import           Data.Maybe          (fromJust)
-import qualified Data.String         as S
-import qualified Data.Text           as T
-import           System.Environment  (lookupEnv)
-import           System.IO.Unsafe    (unsafePerformIO)
+import           Control.Applicative     ((<|>))
+import           Control.Monad           (mzero)
+import qualified Data.Aeson              as A
+import qualified Data.HashMap.Strict     as HM
+import qualified Data.Map.Strict         as Map
+import           Data.Maybe              (fromJust)
+import qualified Data.String             as S
+import qualified Data.Text               as T
+import qualified Data.Text.Lazy          as TL
+import qualified Data.Text.Lazy.Encoding as TE
+import           System.Environment      (lookupEnv)
+import           System.IO.Unsafe        (unsafePerformIO)
 
 newtype Name = Name { unName :: T.Text }
 
@@ -105,3 +107,9 @@ bucketAll brs astsOf (Sizes ss) = Sizes (Map.map goSize ss)
           Nothing         -> Nothing
           Just (Rep s bs) -> Just (Rep s (Map.unions (bs:map (bucket s) brs)))
         bucket sample = bucketSizes [1..20] (astsOf sample)
+
+astsOf :: ([TL.Text] -> [TL.Text]) -> [BucketUtil.Name] -> [BucketUtil.AST]
+astsOf f = map convert . f . map (TL.fromStrict . BucketUtil.unName)
+  where convert a = case A.eitherDecode (TE.encodeUtf8 a) of
+                      Left err -> error err
+                      Right x  -> x

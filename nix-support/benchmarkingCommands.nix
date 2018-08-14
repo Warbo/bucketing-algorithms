@@ -28,23 +28,14 @@ rec {
           import qualified Data.Aeson                 as A
           import qualified Data.ByteString.Lazy.Char8 as LBS
           import qualified Data.Text.Lazy             as T
-          import qualified Data.Text.Lazy.Encoding    as TE
           import qualified ${mod}
-
-          astsOf :: [BucketUtil.Name] -> [BucketUtil.AST]
-          astsOf =  map convert       .
-                    AstsOf.astsOf'    .
-                    map (T.fromStrict . BucketUtil.unName)
-            where convert a = case A.eitherDecode (TE.encodeUtf8 a) of
-                                Left err -> error err
-                                Right x  -> x
 
           main = do
             i <- LBS.getContents
             let names = case A.eitherDecode i of
                   Left err -> error err
                   Right ns -> ns
-                asts     = astsOf names
+                asts     = BucketUtil.astsOf AstsOf.astsOf' names
                 bucketed = BucketUtil.bucketSizes [1..20] asts ${mod}.bucketer
                 entries  = BucketUtil.entries bucketed
             LBS.putStr (A.encode (BucketUtil.toJSON' (head entries)))
