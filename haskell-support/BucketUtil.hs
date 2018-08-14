@@ -58,16 +58,22 @@ clusters asts = fromJust (fromSize <|> fromEnv <|> Just fromIn)
         inCount = length asts
         ceil    = ceiling :: Float -> Int
 
-newtype Method = Method T.Text deriving (Eq, Ord)
+newtype Method = Method { unMethod :: T.Text } deriving (Eq, Ord)
 
-type Bucketer = (Method, Maybe Int -> [AST] -> [[AST]])
+instance A.ToJSON Method where
+  toJSON (Method m) = A.toJSON m
+
+type Bucketer = (Method, Int -> [AST] -> [[AST]])
 
 type Bucketed = Map.Map Method (Map.Map Int [[Name]])
 
 bucketSizes :: [Int] -> [AST] -> Bucketer -> Bucketed
 bucketSizes sizes asts (method, bucket) = Map.singleton method results
   where results = Map.fromList (map go sizes)
-        go size = (size, map (map getName) (bucket (Just size) asts))
+        go size = (size, map (map getName) (bucket size asts))
+
+entries :: Bucketed -> [Map.Map Int [[Name]]]
+entries = map snd . Map.toList
 
 -- For aggregated samples
 
