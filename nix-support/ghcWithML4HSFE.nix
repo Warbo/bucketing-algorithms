@@ -63,9 +63,13 @@ with rec {
   # These are the packages we want to ensure are working
   env = hsPkgs.ghcWithPackages (hs: [
     hs.aeson
+    hs.bytestring
+    hs.containers
     hs.ML4HSFE
     hs.process
     hs.process-extras
+    hs.text
+    hs.th-lift-instances
     hs.unordered-containers
     hs.vector
   ]);
