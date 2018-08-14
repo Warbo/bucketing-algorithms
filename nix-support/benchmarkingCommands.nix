@@ -62,9 +62,6 @@ rec {
       '';
   };
 
-
-  };
-
   addHashBucketsCmd = cmdSkeleton {
     buildInputs = [ (haskellPackages.ghcWithPackages (h: [
       h.aeson h.bytestring h.containers h.cryptonite h.memory h.text
