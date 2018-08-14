@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE TupleSections         #-}
 module BucketUtil where
 
 import           Control.Applicative     ((<|>))
@@ -65,6 +66,9 @@ newtype Method = Method { unMethod :: T.Text } deriving (Eq, Ord)
 instance A.ToJSON Method where
   toJSON (Method m) = A.toJSON m
 
+instance A.FromJSON Method where
+  parseJSON j = Method <$> A.parseJSON j
+
 type Bucketer = (Method, Int -> [AST] -> [[AST]])
 
 type Bucketed = Map.Map Method (Map.Map Int [[Name]])
@@ -94,11 +98,36 @@ instance A.ToJSON Rep where
         size (i, names)           = T.pack (show i) A..= map (map unName) names
      in A.object (("sample" A..= sample):map meth (Map.toList bucketed))
 
+instance A.FromJSON Rep where
+  parseJSON (A.Object hm) = do
+    let vals     = HM.toList hm
+        sample   = snd . head . filter ((== "sample") . fst) $ vals
+        bucketed = filter ((/= "sample") . fst) $ vals
+    sample'   <- A.parseJSON sample
+    bucketed' <- mapM (\(a, b) -> (Method a,) <$> A.parseJSON b) bucketed
+    pure (Rep sample' (Map.fromList bucketed'))
+
 instance A.ToJSON Size where
   toJSON (Size m) = toJSON' m
 
+instance A.FromJSON Size where
+  parseJSON (A.Object hm) = do
+    let rawContent = HM.toList hm
+        fromNull (k, v) = do
+          v' <- A.parseJSON v
+          pure . (read (T.unpack k),) $ case v of
+            A.Null -> Nothing
+            _      -> Just v'
+    withMaybes <- mapM fromNull rawContent
+    let outContent = Map.fromList withMaybes
+    return (Size outContent)
+  parseJSON _ = mzero
+
 instance A.ToJSON Sizes where
   toJSON (Sizes m) = toJSON' m
+
+instance A.FromJSON Sizes where
+  parseJSON j = Sizes <$> A.parseJSON j
 
 bucketAll :: [Bucketer] -> ([Name] -> [AST]) -> Sizes -> Sizes
 bucketAll brs astsOf (Sizes ss) = Sizes (Map.map goSize ss)

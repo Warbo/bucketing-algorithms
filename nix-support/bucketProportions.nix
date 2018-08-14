@@ -23,8 +23,10 @@ with rec {
           "Main.hs"            = writeScript "process-samples-main.hs" ''
             module Main where
 
-            import qualified Data.Aeson as A
+            import qualified AstsOf
             import qualified BucketUtil
+            import qualified Data.Aeson                 as A
+            import qualified Data.ByteString.Lazy.Char8 as LBS
             import qualified HashBucket
             import qualified RecurrentBucket
 
