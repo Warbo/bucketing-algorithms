@@ -102,10 +102,16 @@ with rec {
           h.aeson h.bytestring h.containers h.text h.th-lift-instances
         ]))
       ];
+      main = writeScript "astsof-main.hs" ''
+        module Main where
+        import qualified AstsOf
+        main = AstsOf.main
+      '';
     }
     ''
       cp -v "$modules"/*.hs ./
-      ghc --make AstsOf.hs -o "$out"
+      cp "$main" Main.hs
+      ghc --make Main.hs -o "$out"
     '';
 
   test = runCommand "test-astsOf"
