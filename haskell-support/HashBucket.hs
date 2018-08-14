@@ -75,4 +75,4 @@ render = go (go (A.encode . getAST) (Just keeper)) Nothing
                  map f                .
                  maybe id filter p
 
-bucketer = (Method "hash", bucket)
+bucketer = (Method "hashed", bucket)
