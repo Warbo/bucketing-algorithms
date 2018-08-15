@@ -48,7 +48,7 @@ with rec {
         chmod +w -R mods
         cd mods
         ghc --make -o "$out" ${if profile
-                                  then "-prof -prof-all"
+                                  then "-prof -fprof-auto"
                                   else ""} Main.hs
       '';
   };
