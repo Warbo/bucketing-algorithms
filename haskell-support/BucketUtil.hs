@@ -14,6 +14,7 @@ import qualified Data.String             as S
 import qualified Data.Text               as T
 import qualified Data.Text.Lazy          as TL
 import qualified Data.Text.Lazy.Encoding as TE
+import           Debug.Trace             (trace)
 import           System.Environment      (lookupEnv)
 import           System.IO.Unsafe        (unsafePerformIO)
 
@@ -143,12 +144,13 @@ instance A.FromJSON Sizes where
     where convert (k, v) = (read (T.unpack k),) <$> A.parseJSON v
 
 bucketAll :: [Bucketer] -> ([Name] -> [AST]) -> Sizes -> Sizes
-bucketAll brs astsOf (Sizes ss) = Sizes (Map.map goSize ss)
-  where goSize (Size s) = Size (Map.map goRep s)
+bucketAll brs astsOf (Sizes ss) = Sizes (Map.mapWithKey goSize ss)
+  where goSize size (Size s) = Size (Map.map goRep (msg size s))
         goRep r = case r of
           Nothing         -> Nothing
           Just (Rep s bs) -> Just (Rep s (Map.unions (bs:map (bucket s) brs)))
         bucket sample = bucketSizes [1..20] (astsOf sample)
+        msg s = trace ("Size " ++ show s)
 
 astsOf :: ([TL.Text] -> [TL.Text]) -> [BucketUtil.Name] -> [BucketUtil.AST]
 astsOf f = map convert . f . map (TL.fromStrict . BucketUtil.unName)
