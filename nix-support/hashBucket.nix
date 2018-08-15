@@ -1,13 +1,11 @@
 # Command to read annotated ASTs from stdin, and write them to stdout grouped
 # into "buckets". Chooses what to put in each bucket arbitrarily by using a
 # hash of the names.
-{ bucketCheck, bucketRunner, fail, haskellPackages, jq, mkBin, runCommand,
+{ bucketCheck, bucketRunner, fail, ghcWithML4HSFE, jq, mkBin, runCommand,
   withDeps, writeScript }:
 with rec {
   hashBucket = bucketRunner {
-    buildInputs = [ (haskellPackages.ghcWithPackages (h: [
-      h.aeson h.cryptonite h.memory h.unordered-containers
-    ])) ];
+    buildInputs = [ ghcWithML4HSFE ];
     files = {
       "BucketUtil.hs" = ../haskell-support/BucketUtil.hs;
       "HashBucket.hs" = ../haskell-support/HashBucket.hs;
