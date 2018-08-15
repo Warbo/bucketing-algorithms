@@ -68,11 +68,12 @@ with rec {
   # Useful for tracking down misbehaving bucketers, etc.
   memoryProfile = runCommand "bucketing-memory-profile"
     {
-      prog = addBuckets { profile = true; };
+      prog    =  addBuckets { profile = true;          };
+      samples = makeSamples { maxSize = 10; reps = 10; };
     }
     ''
       mkdir "$out"
       cd "$out"
-      "$prog" -h < "${makeSamples { maxSize = 10; reps = 10; }}" > /dev/null
+      "$prog" +RTS -h -RTS < "$samples" > withBuckets.json
     '';
 }
