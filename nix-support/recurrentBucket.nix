@@ -6,7 +6,7 @@
 
 with rec {
   haskellVersion = bucketRunner {
-    buildInputs = [ ghcWithML4HSFE ];
+    buildInputs = [ (ghcWithML4HSFE {}) ];
     files       = {
       "BucketUtil.hs"      = ../haskell-support/BucketUtil.hs;
       "RecurrentBucket.hs" = ../haskell-support/RecurrentBucket.hs;

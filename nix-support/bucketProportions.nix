@@ -3,19 +3,19 @@
 #
 # Write output to JSON for archiving.
 { attrsToDirs', averageProportions, benchmarkingCommands, calculateProportions,
-  callPackage, ghcWithML4HSFE, runCommand, wrap, writeScript }:
+  callPackage, ghcWithML4HSFE, makeSamples, runCommand, wrap, writeScript }:
 
 with { inherit (builtins) concatStringsSep map; };
 with callPackage ./astsOf.nix {};
 with rec {
   # Runs each sample through all bucketers, adding the result to the samples
   # JSON
-  addBuckets = wrap {
-    name  = "process-samples";
+  addBuckets = { profile ? false }: wrap {
+    name  = "process-samples${if profile then "prof" else ""}";
     vars  = { LANG = "en_US.UTF-8"; };
-    file  = runCommand "process-samples-script"
+    file  = runCommand "process-samples-script${if profile then "prof" else ""}"
       {
-        buildInputs = [ ghcWithML4HSFE ];
+        buildInputs = [ (ghcWithML4HSFE { inherit profile; }) ];
         mods        = attrsToDirs' "bucket-proportions-mods" (astsOfModules // {
           "BucketUtil.hs"      = ../haskell-support/BucketUtil.hs;
           "HashBucket.hs"      = ../haskell-support/HashBucket.hs;
@@ -47,12 +47,15 @@ with rec {
         cp -rv "$mods" mods
         chmod +w -R mods
         cd mods
-        ghc --make -o "$out" Main.hs
+        ghc --make -o "$out" ${if profile
+                                  then "-prof -prof-all"
+                                  else ""} Main.hs
       '';
   };
 };
 
-rec {
-  inherit addBuckets averageProportions calculateProportions;
+{
+  inherit averageProportions calculateProportions;
   inherit (benchmarkingCommands) getGroundTruths;
+  addBuckets = addBuckets {};
 }

@@ -7,8 +7,8 @@
 #  - The impact of the bucketing algorithms is measured, on lots of test data
 #  - The speed of the scripts is measured on small inputs, to aid us in
 #    optimising their implementation (since the above can be very slow!)
-{ attrsToDirs', bash, callPackage, ghcWithML4HSFE, haskellPackages, jq, lib,
-  runCommand, wrap, writeScript }:
+{ attrsToDirs', bash, callPackage, ghcWithML4HSFE, jq, lib, runCommand, wrap,
+  writeScript }:
 
 with builtins;
 with callPackage ./astsOf.nix {};
@@ -63,7 +63,7 @@ rec {
   };
 
   addRecurrentBucketsCmd = cmdSkeleton {
-    buildInputs = [ ghcWithML4HSFE ];
+    buildInputs = [ (ghcWithML4HSFE {}) ];
     mod         = "RecurrentBucket";
     name        = "recurrent";
   };

@@ -13,55 +13,63 @@ with rec {
       };
     }) {};
 
+  # If added to Haskell overrides, will force all packages to be profiled
+  profiler = super: {
+    mkDerivation = args: super.mkDerivation (args // {
+      enableLibraryProfiling = true;
+    });
+  };
+
   # Override haskellPackages entries to ensure compatible dependencies are used
   # for ML4HSFE and the other libraries we want to use with it. We do this here
   # rather than in haskellPackages, since there's no point trying to coordinate
   # all dependencies of all our Haskell packages to be mutually compatible with
   # each other. If these packages' dependencies break other stuff, we don't need
   # to care since we're not using these for anything else.
-  hsPkgs = nixpkgs1803.haskell.packages.ghc7103.override (old: {
-    overrides = nixpkgs1803.lib.composeExtensions
-      (old.overrides or (_: _: {}))
-      (self: super: {
-        # Tests can fail due to missing Arbitrary instances
-        aeson = haskell.lib.dontCheck super.aeson;
+  hsPkgs = { profile ? false }:
+    nixpkgs1803.haskell.packages.ghc7103.override (old: {
+      overrides = nixpkgs1803.lib.composeExtensions
+        (old.overrides or (_: _: {}))
+        (self: super: (if profile then profiler super else {}) // {
+          # Tests can fail due to missing Arbitrary instances
+          aeson = haskell.lib.dontCheck super.aeson;
 
-        # Dependency of ML4HSFE. Note that this needs GHC 7.10, due to changes
-        # in GHC's package DB implementation.
-        HS2AST = getRepo {
-          inherit self;
-          name   = "HS2AST";
-          repo   = "hs2ast";
-          rev    = "469d999";
-          sha256 = "1x2f12s6caj0gaymaw62bmm62ydim78wm2pn18j18fa2l3p7vqyi";
-        };
+          # Dependency of ML4HSFE. Note that this needs GHC 7.10, due to changes
+          # in GHC's package DB implementation.
+          HS2AST = getRepo {
+            inherit self;
+            name   = "HS2AST";
+            repo   = "hs2ast";
+            rev    = "469d999";
+            sha256 = "1x2f12s6caj0gaymaw62bmm62ydim78wm2pn18j18fa2l3p7vqyi";
+          };
 
-        # This is the package we want, all of the rest are dependencies.
-        ML4HSFE = getRepo {
-          inherit self;
-          name   = "ML4HSFE";
-          repo   = "ml4hsfe";
-          rev    = "e4e4cea";
-          sha256 = "1kcnhbkgfp0akp0g0jxh11f1zn96jybgl7rniwabhxpr9hszj3kn";
-        };
+          # This is the package we want, all of the rest are dependencies.
+          ML4HSFE = getRepo {
+            inherit self;
+            name   = "ML4HSFE";
+            repo   = "ml4hsfe";
+            rev    = "e4e4cea";
+            sha256 = "1kcnhbkgfp0akp0g0jxh11f1zn96jybgl7rniwabhxpr9hszj3kn";
+          };
 
-        # If this is 2.10+ then quickspec 0.9.6 hits an "ambiguous 'total'"
-        # error. Version 2.9 hits problems elsewhere, with semigroups, instances
-        # and quickcheck-io packages.
-        QuickCheck = self.callHackage "QuickCheck" "2.8.2" {};
+          # If this is 2.10+ then quickspec 0.9.6 hits an "ambiguous 'total'"
+          # error. Version 2.9 hits problems elsewhere, with semigroups, instances
+          # and quickcheck-io packages.
+          QuickCheck = self.callHackage "QuickCheck" "2.8.2" {};
 
-        # We use QuickSpec version 1 (0.9.6) since version 2+ is very different
-        quickspec = self.callHackage "quickspec" "0.9.6" {};
+          # We use QuickSpec version 1 (0.9.6) since version 2+ is very different
+          quickspec = self.callHackage "quickspec" "0.9.6" {};
 
-        # This package was converted to Nix in the context of GHC 8, but it
-        # depends on semigroups when using GHC 7.
-        system-filepath = haskell.lib.addBuildDepend super.system-filepath
-                                                     self.semigroups;
-      });
-  });
+          # This package was converted to Nix in the context of GHC 8, but it
+          # depends on semigroups when using GHC 7.
+          system-filepath = haskell.lib.addBuildDepend super.system-filepath
+                                                       self.semigroups;
+        });
+    });
 
   # These are the packages we want to ensure are working
-  env = hsPkgs.ghcWithPackages (hs: [
+  env = args: (hsPkgs args).ghcWithPackages (hs: [
     hs.aeson
     hs.bytestring
     hs.containers

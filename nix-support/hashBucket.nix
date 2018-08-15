@@ -5,7 +5,7 @@
   withDeps, writeScript }:
 with rec {
   hashBucket = bucketRunner {
-    buildInputs = [ ghcWithML4HSFE ];
+    buildInputs = [ (ghcWithML4HSFE {}) ];
     files = {
       "BucketUtil.hs" = ../haskell-support/BucketUtil.hs;
       "HashBucket.hs" = ../haskell-support/HashBucket.hs;
