@@ -58,4 +58,15 @@ with rec {
   inherit averageProportions calculateProportions;
   inherit (benchmarkingCommands) getGroundTruths;
   addBuckets = addBuckets {};
+
+  # Useful for tracking down misbehaving bucketers, etc.
+  memoryProfile = runCommand "bucketing-memory-profile"
+    {
+      prog = addBuckets { profile = true; };
+    }
+    ''
+      mkdir "$out"
+      cd "$out"
+      "$prog" -h < "${makeSamples { maxSize = 10; reps = 10; }}" > /dev/null
+    '';
 }
