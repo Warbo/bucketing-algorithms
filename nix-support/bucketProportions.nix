@@ -47,9 +47,15 @@ with rec {
         cp -rv "$mods" mods
         chmod +w -R mods
         cd mods
-        ghc --make -o "$out" ${if profile
-                                  then "-prof -fprof-auto"
-                                  else ""} Main.hs
+        ghc --make -o "$out" Main.hs
+        ${if profile
+             /* Only compile for profiling after we've done a normal compile, so
+                GHC finds unprofiled TemplateHaskell snippets it can run (it
+                can't run/splice profiled ones). Use osuf to keep them separate.
+                https://downloads.haskell.org/%7Eghc/6.10.2/docs/html/users_guide/template-haskell.html#id2715975
+              */
+             then "ghc --make -o \"$out\" -prof -fprof-auto -osuf p_o Main.hs"
+             else ""}
       '';
   };
 };
