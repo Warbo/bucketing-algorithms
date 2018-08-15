@@ -117,6 +117,7 @@ instance A.FromJSON Rep where
         bucketed' = map convert1 bucketed
     sample' <- A.parseJSON sample
     pure (Rep sample' (Map.fromList bucketed'))
+  parseJSON v = error ("Can't parse a Rep from: " ++ show v)
 
 instance A.ToJSON Size where
   toJSON (Size m) = toJSON' m
@@ -125,10 +126,9 @@ instance A.FromJSON Size where
   parseJSON (A.Object hm) = do
     let rawContent = HM.toList hm
         fromNull (k, v) = do
-          v' <- A.parseJSON v
-          pure . (read (T.unpack k),) $ case v of
-            A.Null -> Nothing
-            _      -> Just v'
+          (read (T.unpack k),) <$> case v of
+            A.Null -> pure Nothing
+            _      -> Just <$> A.parseJSON v
     withMaybes <- mapM fromNull rawContent
     let outContent = Map.fromList withMaybes
     return (Size outContent)
