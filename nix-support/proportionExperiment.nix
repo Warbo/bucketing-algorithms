@@ -4,34 +4,37 @@
 
 with bucketProportions;
 with rec {
-  results = {
-    "samples.json" = makeSamples {
-      maxSize = 100;
-      reps    = 100;
+  go = { label ? "results", maxSize ? 100, reps ? 100 }: rec {
+    steps = {
+      "samples.json" = makeSamples { inherit maxSize reps; };
+
+      "withBuckets.json" =
+        runOn "with-buckets"
+              addBuckets
+              steps."samples.json";
+
+      "withBucketsGroundTruths.json" =
+        runOn "with-ground-truths"
+              getGroundTruths
+              steps."withBuckets.json";
+
+      "withBucketsGroundTruthsProportions.json" =
+        runOn "with-proportions"
+              calculateProportions
+              steps."withBucketsGroundTruths.json";
+
+      "averageBucketProportions.json" =
+        runOn "with-averages"
+              averageProportions
+              steps."withBucketsGroundTruthsProportions.json";
     };
 
-    "withBuckets.json" =
-      runOn "with-buckets"
-            addBuckets
-            results."samples.json";
-
-    "withBucketsGroundTruths.json" =
-      runOn "with-ground-truths"
-            getGroundTruths
-            results."withBuckets.json";
-
-    "withBucketsGroundTruthsProportions.json" =
-      runOn "with-proportions"
-            calculateProportions
-            results."withBucketsGroundTruths.json";
-
-    "averageBucketProportions.json" =
-      runOn "with-averages"
-            averageProportions
-            results."withBucketsGroundTruthsProportions.json";
+    results = attrsToDirs' "proportion-experiment-${label}" steps;
   };
+
+
 };
 {
-  steps   = results;
-  results = attrsToDirs' "proportion-experiment-results" results;
+  results = go {};
+  test    = go { label = "test"; maxSize = 2; reps = 30; };
 }
