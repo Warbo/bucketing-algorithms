@@ -54,10 +54,7 @@ rec {
   };
 
   addHashBucketsCmd = cmdSkeleton {
-    buildInputs = [ (haskellPackages.ghcWithPackages (h: [
-      h.aeson h.bytestring h.containers h.cryptonite h.memory h.text
-      h.th-lift-instances h.unordered-containers
-    ])) ];
+    buildInputs = [ (ghcWithML4HSFE {}) ];
     mod         = "HashBucket";
     name        = "hash";
   };
