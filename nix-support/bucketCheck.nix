@@ -29,8 +29,10 @@
     echo "Testing single input" 1>&2
     O=$(mkObj foo T)
     GOT=$(echo "[$O]" | CLUSTER_SIZE=10 "$go")
-    echo "$GOT" | jq -e --argjson o "$O" '. == [[$o + {"cluster":1}]]' ||
-      fail "Expected '[[$O]]' with a 'cluster: 1' added; got '$GOT'"
+    echo "$GOT" | jq -e --argjson o "$O" '. == [[{"package" : $o.package,
+                                                  "module"  : $o.module ,
+                                                  "name"    : $o.name   }]]' ||
+      fail "Expected '[[$O]]' with only name/module/package; got '$GOT'"
 
     O=$(echo "[$(mkObj foo T), $(mkObj bar U)]" |
           CLUSTER_SIZE=1 "$go") || fail "Didn't bucket"

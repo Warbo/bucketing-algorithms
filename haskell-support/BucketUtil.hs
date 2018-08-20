@@ -1,3 +1,5 @@
+{-# LANGUAGE BangPatterns          #-}
+{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE PartialTypeSignatures #-}
@@ -5,6 +7,7 @@
 module BucketUtil where
 
 import           Control.Applicative     ((<|>))
+import           Control.DeepSeq         (($!!), force, NFData)
 import           Control.Monad           (mzero)
 import qualified Data.Aeson              as A
 import qualified Data.HashMap.Strict     as HM
@@ -15,10 +18,13 @@ import qualified Data.Text               as T
 import qualified Data.Text.Lazy          as TL
 import qualified Data.Text.Lazy.Encoding as TE
 import           Debug.Trace             (trace)
+import           GHC.Generics            (Generic)
+import qualified HS2AST.Types            as HT
 import           System.Environment      (lookupEnv)
 import           System.IO.Unsafe        (unsafePerformIO)
 
-newtype Name = Name { unName :: T.Text }
+newtype Name = Name { unName :: T.Text } deriving Generic
+instance NFData Name
 
 instance A.FromJSON Name where
   parseJSON j = Name <$> A.parseJSON j
@@ -29,8 +35,10 @@ instance A.ToJSON Name where
 data AST = AST {
   getName :: Name,
   getAST  :: A.Object,
-  keeper  :: Bool
-}
+  keeper  :: !Bool
+} deriving Generic
+
+instance NFData AST
 
 instance A.ToJSON AST where
   toJSON = A.Object . getAST
@@ -40,7 +48,7 @@ instance A.FromJSON AST where
     n <- o A..:  "name"
     t <- o A..:? "type"
     q <- o A..:? "quickspecable"
-    pure (AST {
+    pure $! force (AST {
       getName = n,
       getAST  = HM.delete "features" o,
       keeper  = case (q, t :: Maybe String) of
@@ -70,14 +78,14 @@ instance A.ToJSON Method where
 instance A.FromJSON Method where
   parseJSON j = Method <$> A.parseJSON j
 
-type Bucketer = (Method, Int -> [AST] -> [[AST]])
+type Bucketer = (Method, Int -> [AST] -> [[HT.Identifier]])
 
 type Bucketed = Map.Map Method (Map.Map Int [[Name]])
 
 bucketSizes :: [Int] -> [AST] -> Bucketer -> Bucketed
 bucketSizes sizes asts (method, bucket) = Map.singleton method results
   where results = Map.fromList (map go sizes)
-        go size = (size, map (map getName) (bucket size asts))
+        go size = (size, map (map (Name . HT.idName)) (bucket size asts))
 
 entries :: Bucketed -> [Map.Map Int [[Name]]]
 entries = map snd . Map.toList
@@ -157,3 +165,9 @@ astsOf f = map convert . f . map (TL.fromStrict . BucketUtil.unName)
   where convert a = case A.eitherDecode (TE.encodeUtf8 a) of
                       Left err -> error err
                       Right x  -> x
+
+astToId :: AST -> HT.Identifier
+astToId x = HT.ID { HT.idPackage = p, HT.idModule = m , HT.idName = n }
+  where [Just (A.String !p), Just (A.String !m), Just (A.String !n)] =
+          map (\k -> HM.lookup k ast) ["package", "module", "name"]
+        ast = getAST x

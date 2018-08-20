@@ -49,8 +49,8 @@ with rec {
             inherit self;
             name   = "ML4HSFE";
             repo   = "ml4hsfe";
-            rev    = "e1ef3ec";
-            sha256 = "0095bn0k10w2rki1hipff69837w2dlyknqxkl5n9dl0cxcp9n39s";
+            rev    = "a6635a3";
+            sha256 = "1gf9rpzwdn8pwicf581w2kx9cwzr8aqancajnilc638zy3787z02";
           };
 
           # If this is 2.10+ then quickspec 0.9.6 hits an "ambiguous 'total'"

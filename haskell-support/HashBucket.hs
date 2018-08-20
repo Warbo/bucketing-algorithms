@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns      #-}
 {-# LANGUAGE OverloadedStrings #-}
 module HashBucket where
 import           BucketUtil
@@ -14,6 +15,7 @@ import qualified Data.List                  as L
 import qualified Data.Map.Strict            as Map
 import           Data.Maybe                 (fromJust)
 import qualified Data.Text.Encoding         as TE
+import qualified HS2AST.Types               as HT
 import           System.Environment         (lookupEnv)
 import           System.IO.Unsafe           (unsafePerformIO)
 
@@ -27,18 +29,19 @@ instance A.FromJSON Input where
                      pure (Input asts)
     _          -> mzero
 
-bucket :: Int -> [AST] -> [[AST]]
+bucket :: Int -> [AST] -> [[HT.Identifier]]
 bucket cs asts = go (Map.fromList [(i - 1, []) | i <- [1..cs]]) asts
-  where go acc []     = Map.elems acc
-        go acc (a:as) = let (c, a') = pickBucket (toInteger cs) a
-                         in go (addToBucket c a' acc) as
+  where go !acc []     = Map.elems acc
+        go !acc (a:as) = let (c, a') = pickBucket (toInteger cs) a
+                          in go (addToBucket c a' acc) as
 
-type BucketMap = Map.Map Int [AST]
+type BucketMap = Map.Map Int [HT.Identifier]
 
 addToBucket :: Int -> AST -> BucketMap -> BucketMap
 addToBucket i v m = Map.alter insert i m
-  where insert Nothing   = Just [v]
-        insert (Just vs) = Just (v:vs)
+  where insert Nothing   = Just [id]
+        insert (Just vs) = Just (id:vs)
+        id               = astToId v
 
 pickBucket :: Integer -> AST -> (Int, AST)
 pickBucket clusters x = (cluster, x { getAST  = ast' })

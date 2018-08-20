@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns      #-}
 {-# LANGUAGE OverloadedStrings #-}
 module RecurrentBucket where
 import           BucketUtil
@@ -10,39 +11,28 @@ import qualified Data.Functor.Identity      as I
 import qualified Data.HashMap.Strict        as H
 import           Data.Maybe                 (fromJust)
 import qualified Data.Vector                as V
+import qualified HS2AST.Types               as HT
 import           ML4HSFE.Loop
-import           ML4HSFE.Outer
+import qualified ML4HSFE.Outer              as O
+import qualified ML4HSFE.Types              as Ty
 import           System.Environment
 import           System.IO
 import           System.IO.Unsafe           (unsafePerformIO)
 
-bucket :: Int -> [AST] -> [[AST]]
-bucket c asts = map (map convert) processed
-  where clustered = I.runIdentity
-                      (clusterLoop (pureKmeans (Just c))
-                                   (handleString width height (A.encode asts)))
-        processed = processAsts clustered
-        convert v = case A.fromJSON v of
-                      A.Error err -> error err
-                      A.Success x -> x
+bucket :: Int -> [AST] -> [[HT.Identifier]]
+bucket !c !asts = processAsts clustered
+  where (entries, sccs) = handle width height (A.encode asts)
+        clustered       = O.clusterLoop (O.pureKmeans (Just c)) entries sccs
 
 bucketer = (Method "recurrent", bucket)
 
-processAsts = H.elems . V.foldl' acc H.empty
-  where acc h v = case v of
-                    A.Object o -> ins h o
-                    _          -> error ("Expected obj got " ++ show v)
-
-        ins h o = let A.Number n = o H.! "cluster"
-                   in case (o H.! "quickspecable", o H.! "type") of
-                        (_,           A.Null) -> h
-                        (A.Bool True, _     ) ->
-                          H.insertWith (++)
-                                       n
-                                       [A.Object
-                                         (H.delete "tocluster"
-                                           (H.delete "features" o))]
-                                       h
+processAsts = H.elems . V.foldl' ins H.empty
+  where ins h o = case (Ty.entryCluster       o,
+                        Ty.entryQuickspecable o,
+                        Ty.entryTyped         o) of
+          (Nothing, _   , _    ) -> error "Unclustered AST"
+          (_      , _   , False) -> h
+          (Just n , True, True ) -> H.insertWith (++) n [Ty.entryId o] h
 
 width, height :: Int
 (width, height) = unsafePerformIO $ do
