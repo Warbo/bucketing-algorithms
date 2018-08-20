@@ -7,7 +7,7 @@
 module BucketUtil where
 
 import           Control.Applicative     ((<|>))
-import           Control.DeepSeq         (($!!), force, NFData)
+import           Control.DeepSeq         (($!!), deepseq, force, NFData)
 import           Control.Monad           (mzero)
 import qualified Data.Aeson              as A
 import qualified Data.HashMap.Strict     as HM
@@ -85,7 +85,8 @@ type Bucketed = Map.Map Method (Map.Map Int [[Name]])
 bucketSizes :: [Int] -> [AST] -> Bucketer -> Bucketed
 bucketSizes sizes asts (method, bucket) = Map.singleton method results
   where results = Map.fromList (map go sizes)
-        go size = (size, map (map (Name . HT.idName)) (bucket size asts))
+        go size = let buckets = map (map (Name . HT.idName)) (bucket size asts)
+                   in size `deepseq` buckets `deepseq` (size, buckets)
 
 entries :: Bucketed -> [Map.Map Int [[Name]]]
 entries = map snd . Map.toList
