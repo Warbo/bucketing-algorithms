@@ -3,7 +3,8 @@
 #
 # Write output to JSON for archiving.
 { attrsToDirs', averageProportions, benchmarkingCommands, calculateProportions,
-  callPackage, ghcWithML4HSFE, makeSamples, runCommand, wrap, writeScript }:
+  callPackage, ghcWithML4HSFE, ghostscript, haskellPackages, makeSamples,
+  runCommand, wrap, writeScript }:
 
 with { inherit (builtins) concatStringsSep map; };
 with callPackage ./astsOf.nix {};
@@ -74,6 +75,21 @@ with rec {
     ''
       mkdir "$out"
       cd "$out"
-      "$prog" +RTS -h -RTS < "$samples" > withBuckets.json
+      "$prog" +RTS -hc -L50 -RTS < "$samples" > withBuckets.json
+      mv -v *.hp heap.hp
+
+      echo "Rendering heap usage as PostScript chart" 1>&2
+      if "${ghcWithML4HSFE {}}/bin/hp2ps" -c < heap.hp > heap.ps
+      then
+        echo "Converting PostScript to PDF" 1>&2
+        "${ghostscript}/bin/ps2pdf" heap.ps ||
+          echo "WARNING: Failed converting chart to PDF" 1>&2
+      else
+        echo "WARNING: Failed to render PostScript heap chart" 1>&2
+      fi
+
+      echo "Rendering heap usage as SVG chart" 1>&2
+      "${haskellPackages.hp2pretty}/bin/hp2pretty" heap.hp ||
+        echo "WARNING: Failed to render SVG heap chart"
     '';
 }

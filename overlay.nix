@@ -65,6 +65,9 @@ with rec {
       # Needed for Nix 2.x daemon tunnel hack
       cabal2nix
 
+      # I had problems with dependencies of other versions
+      ghostscript
+
       # Provides subprocess.run and withPackages
       python python3 python3Packages;
 
