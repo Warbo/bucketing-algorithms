@@ -2,6 +2,7 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE TemplateHaskell       #-}
 module AstsOf where
+import           Control.DeepSeq            (deepseq, force, NFData, rnf)
 import qualified Data.Aeson                 as Aeson
 import qualified Data.ByteString.Lazy.Char8 as BS
 import qualified Data.Map.Lazy              as Map
@@ -11,14 +12,22 @@ import AstsHelpers
 import Instances.TH.Lift  -- So we can 'lift' a Map
 import Language.Haskell.TH.Syntax (lift, runIO)
 
+-- We want to fully evaluate the entries of our map
+instance NFData AST where
+  rnf (AST t) = rnf t
+
+instance NFData Name where
+  rnf (Name n) = rnf n
+
 -- Runs mkASTMap on a known source of ASTs
 astMap :: ASTMap
-astMap = Map.fromList (map (\(n, a) -> (Name n, AST a))
-  $(do let f = "REPLACEME"
-       bs <- runIO (BS.readFile f)
-       let m = mkASTMap bs
-           l = Map.toList m
-       lift (map (\(n, a) -> (unName n, unAST a)) l)))
+astMap = force result
+  where result  = Map.fromList (map (\(n, a) -> (Name n, AST a)) entries)
+        entries = $(do let f = "REPLACEME"
+                       bs <- runIO (BS.readFile f)
+                       let m = mkASTMap bs
+                           l = Map.toList m
+                       lift (map (\(n, a) -> (unName n, unAST a)) l))
 
 -- Parse, lookup, print
 
