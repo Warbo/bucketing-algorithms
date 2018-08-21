@@ -68,6 +68,9 @@ with rec {
       # I had problems with dependencies of other versions
       ghostscript
 
+      # Old URL seems to be down
+      moreutils
+
       # Provides subprocess.run and withPackages
       python python3 python3Packages;
 
