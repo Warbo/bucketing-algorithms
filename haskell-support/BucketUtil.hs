@@ -113,13 +113,6 @@ entries = map snd . Map.toList
 toJSON' m = let convert (k, v) = force (T.pack (show k)) A..= v
              in A.object (map convert (Map.toList m))
 
-newtype Sizes = Sizes (Map.Map Int Size)
-
-newtype Size  = Size  (Map.Map Int (Maybe Rep))
-
-instance NFData Size where
-  rnf (Size s) = rnf s
-
 data    Rep   = Rep { sample :: [Name], bucketed :: Bucketed }
 
 instance NFData Rep where
@@ -150,40 +143,6 @@ instance A.FromJSON Rep where
     sample' <- A.parseJSON sample
     pure $! force (Rep sample' (Map.fromList bucketed'))
   parseJSON v = mzero
-
-instance A.ToJSON Size where
-  toJSON (Size m) = toJSON' m
-
-instance A.FromJSON Size where
-  parseJSON (A.Object hm) = do
-    let rawContent = HM.toList hm
-        fromNull (k, v) = do
-          (read (T.unpack k),) <$> case v of
-            A.Null -> pure Nothing
-            _      -> Just <$> A.parseJSON v
-    withMaybes <- mapM fromNull rawContent
-    let outContent = Map.fromList withMaybes
-    return (Size outContent)
-  parseJSON _ = mzero
-
-instance A.ToJSON Sizes where
-  toJSON (Sizes m) = toJSON' m
-
-instance A.FromJSON Sizes where
-  parseJSON x = case x of
-      A.Object hm -> Sizes . Map.fromList <$> mapM convert (HM.toList hm)
-      _           -> mzero
-    where convert (!k, v) = (force (read (T.unpack k)),) <$> A.parseJSON v
-
-bucketAll :: [Bucketer] -> ([Name] -> [AST]) -> Sizes -> Sizes
-bucketAll brs astsOf (Sizes !ss) = ss `deepseq` Sizes (Map.mapWithKey goSize ss)
-  where goSize size (Size s) = Size (Map.map goRep s)
-        goRep r = case r of
-          Nothing         -> Nothing
-          Just (Rep s bs) -> let r' = Map.unions (bs:map (bucket s) brs)
-                              in s `deepseq` bs `deepseq` Just (Rep s r')
-        bucket sample = bucketSizes [1..20] (astsOf sample)
-        msg s = trace ("Size " ++ show s)
 
 astsOf :: ([TL.Text] -> [TL.Text]) -> [BucketUtil.Name] -> [BucketUtil.AST]
 astsOf f = map convert . f . map (TL.fromStrict . BucketUtil.unName)
