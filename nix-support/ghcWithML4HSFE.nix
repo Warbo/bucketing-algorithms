@@ -74,6 +74,7 @@ with rec {
     hs.bytestring
     hs.containers
     hs.cryptonite
+    hs.intern
     hs.memory
     hs.ML4HSFE
     hs.process

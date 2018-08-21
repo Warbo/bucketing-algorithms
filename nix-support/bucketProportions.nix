@@ -4,7 +4,7 @@
 # Write output to JSON for archiving.
 { attrsToDirs', averageProportions, benchmarkingCommands, calculateProportions,
   callPackage, ghcWithML4HSFE, ghostscript, haskellPackages, makeSamples,
-  runCommand, wrap, writeScript }:
+  moreutils, runCommand, wrap, writeScript }:
 
 with { inherit (builtins) concatStringsSep map; };
 with callPackage ./astsOf.nix {};
@@ -26,21 +26,12 @@ with rec {
 
             import qualified AstsOf
             import qualified BucketUtil
-            import qualified Data.Aeson                 as A
-            import qualified Data.ByteString.Lazy.Char8 as LBS
             import qualified HashBucket
             import qualified RecurrentBucket
 
             bucketers = [HashBucket.bucketer, RecurrentBucket.bucketer]
 
-            go = BucketUtil.bucketAll bucketers
-                                      (BucketUtil.astsOf AstsOf.astsOf')
-
-            main = do
-              i <- LBS.getContents
-              case A.eitherDecode i of
-                Left err -> error err
-                Right ss -> LBS.putStr (A.encode (go ss))
+            main = BucketUtil.bucketStdio bucketers AstsOf.astsOf'
           '';
         });
       }
@@ -73,9 +64,15 @@ with rec {
       samples = makeSamples { maxSize = 10; reps = 10; };
     }
     ''
+      function getStderr {
+        echo "BEGIN"
+        "$prog" +RTS -hc -L150 -RTS < "$samples" 2>&1 1> /dev/null
+        echo "END"
+      }
+
       mkdir "$out"
       cd "$out"
-      "$prog" +RTS -hc -L50 -RTS < "$samples" > withBuckets.json
+      getStderr | "${moreutils}/bin/ts" -s "%T" | tee times
       mv -v *.hp heap.hp
 
       echo "Rendering heap usage as PostScript chart" 1>&2
