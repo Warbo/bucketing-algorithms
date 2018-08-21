@@ -66,7 +66,7 @@ with rec {
     ''
       function getStderr {
         echo "BEGIN"
-        "$prog" +RTS -hc -L150 -RTS < "$samples" 2>&1 1> /dev/null
+        "$prog" +RTS -hc -L50 -RTS < "$samples" 2>&1 1> /dev/null
         echo "END"
       }
 
