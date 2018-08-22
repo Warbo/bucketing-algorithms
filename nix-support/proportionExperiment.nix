@@ -1,7 +1,7 @@
 # Performs bucketing on a large set of samples, gets their ground truths,
 # calculates the proportion remaining after bucketing and averages them.
 { attrsToDirs', bash, bucketProportions, composeBins, lzip, makeSamples, runOn,
-  wrap }:
+  withDeps, wrap }:
 
 with bucketProportions;
 with rec {
@@ -16,9 +16,9 @@ with rec {
     '';
   };
 
-  go = { label ? "results", maxSize ? 100, reps ? 100 }: rec {
+  go = { label ? "results", maxSize ? 100, reps ? 100, deps ? [] }: rec {
     steps = {
-      "samples.json" = makeSamples { inherit maxSize reps; };
+      "samples.json" = withDeps deps (makeSamples { inherit maxSize reps; });
 
       "withBuckets.json.lz" =
         runOn "with-buckets"
@@ -44,9 +44,9 @@ with rec {
     results = attrsToDirs' "proportion-experiment-${label}" steps;
   };
 
-
+  test = go { label = "test"; maxSize = 2; reps = 30; };
 };
 {
-  results = go {};
-  test    = go { label = "test"; maxSize = 2; reps = 30; };
+  inherit test;
+  results = go { deps = [ test.results ]; };
 }
