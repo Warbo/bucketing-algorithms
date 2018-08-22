@@ -159,25 +159,19 @@ astToId x = HT.ID { HT.idPackage = p, HT.idModule = m , HT.idName = n }
 -- Streaming JSON parsing/printing
 
 bucketStdio :: [Bucketer] -> ([TL.Text] -> [TL.Text]) -> IO ()
-bucketStdio brs f = runHandler (processSizes (astsOf f, brs))
+bucketStdio brs f = processSizes (astsOf f, brs)
 
 -- We read in JSON and write out JSON with the same structure, plus some extras.
 -- It's wasteful to accumulate this in memory, so instead we process one rep at
--- a time. Assuming there are nested JSON objects on stdin, the 'Handler' type
--- tells us how to handle each nested level: Blocking is a simple function which
--- is given ByteStrings of the key and value, and should write its own to
--- stdout. Streaming applies a Handler to each key.
-
-data Handler = Blocking  (LBS.ByteString -> LBS.ByteString -> IO ())
-             | Streaming (LBS.ByteString -> Handler)
+-- a time.
 
 putErr = LBS.hPut stderr
 
-processSizes opts      = Streaming (processSize opts)
+processSizes opts      =  streamKeyVals (processSize opts)
 
-processSize  opts size = Blocking (processRep'  opts size)
-
---processRep   opts rep  = Blocking  (processRep' opts)
+processSize  opts size = do LBS.putStr (LBS.filter (/= ',') size)
+                            putChar ':'
+                            processKeyVals (processRep' opts size)
 
 processRep' :: (_, _) -> LBS.ByteString -> LBS.ByteString -> LBS.ByteString
             -> IO ()
@@ -205,45 +199,52 @@ processRep' (astsOf, bucketers) size !key !bs =
         notStart 'N' = False
         notStart _   = True
 
-runHandler h = case h of
-    Blocking  f -> processKeyVals f
-    Streaming f ->  streamKeyVals f
-
 -- Return the next non-space Char from stdin; treat : and , as whitespace
 skipSpace = do c <- getChar
                if C.isSpace c || c `elem` (":," :: String)
                   then skipSpace
                   else pure c
 
+trimKey = LBS.reverse . go . LBS.reverse . go
+  where go = LBS.dropWhile (/= '"')
+
 -- Reads a '{' delimiter, then loops: reads a key and value from stdin, calls f
 -- on them, then repeats; stops once the corresponding '}' gets read.
 processKeyVals :: (LBS.ByteString -> LBS.ByteString -> IO ()) -> IO ()
 processKeyVals f = do c <- skipSpace
                       case c of
-                        '{' -> go
+                        '{' -> putChar '{' >> go True
                         _   -> error (show (("Expected", '{'), ("Got", c)))
-  where go = do mk <- parseOne
-                case mk of
-                  Nothing -> pure () -- We've hit, and consumed, the '}'
-                  Just !k -> do mv <- parseOne
-                                case mv of
-                                  Nothing -> error (show (("Error",
-                                                           "Key missing value"),
-                                                          ("Key", k)))
-                                  Just !v -> f k v >> go
+  where go first = do mk <- parseOne
+                      case mk of
+                        Nothing -> putChar '}' -- We've hit, and consumed, the '}'
+                        Just !k -> do mv <- parseOne
+                                      case mv of
+                                        Nothing -> error (show (("Error",
+                                                                 "Key missing value"),
+                                                                ("Key", k)))
+                                        Just !v -> do if first
+                                                         then pure ()
+                                                         else putChar ','
+                                                      f (trimKey k) v
+                                                      go False
 
 -- Reads a '{' delimiter, then loops: reads a key from stdin, calls f with that
 -- key, then repeats (f is responsible for reading the value); stops once the
 -- corresponding '}' gets read.
-streamKeyVals :: (LBS.ByteString -> Handler) -> IO ()
+streamKeyVals :: (LBS.ByteString -> IO ()) -> IO ()
 streamKeyVals f = do c <- skipSpace
                      case c of
-                       '{' -> go
+                       '{' -> putChar '{' >> go True
                        _   -> error (show (("Wanted", '{'), ("Got", c)))
-  where go = do mk <- parseOne
-                case mk of
-                  Nothing -> pure () -- We've hit, and consumed, the '}'
-                  Just !k -> runHandler (f k) >> go
+  where go first = do mk <- parseOne
+                      case mk of
+                        Nothing -> putChar '}' -- We've hit, and consumed, the '}'
+                        Just !k -> do if first
+                                         then pure ()
+                                         else putChar ','
+                                      f (trimKey k)
+                                      go False
 
 -- Parse a JSON container from stdin (a string, array, object or null), return
 -- the ByteString it spans. Returns Nothing if we hit an unexpected close
