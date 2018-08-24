@@ -1,13 +1,11 @@
-{ fail, haskellPackages, jq, makeSamples, mkBin, runCommand, tebenchmark,
+{ fail, ghcWithML4HSFE, haskellPackages, jq, makeSamples, mkBin, runCommand, tebenchmark,
   withDeps, wrap, writeScript }:
 
 with rec {
   haskellVersion = runCommand "get-ground-truths-haskell"
     (tebenchmark.cache // {
-      buildInputs = [ (haskellPackages.ghcWithPackages (h: [
-        h.aeson h.atto-lisp h.attoparsec h.bytestring h.text
-      ])) ];
-      helper = writeScript "get-ground-truths-helper.hs" ''
+      buildInputs = [ (ghcWithML4HSFE {}) ];
+      helper      = writeScript "get-ground-truths-helper.hs" ''
         {-# LANGUAGE OverloadedStrings, TemplateHaskell #-}
         module Helper where
 
@@ -96,11 +94,12 @@ with rec {
       '';
 
       main = writeScript "get-ground-truths-main.hs" ''
-        {-# LANGUAGE OverloadedStrings, TemplateHaskell #-}
+        {-# LANGUAGE BangPatterns, OverloadedStrings, TemplateHaskell #-}
         module Main where
 
         import           Helper
         import           Control.Monad              (mzero)
+        import qualified BucketUtil                 as BU
         import qualified Data.Aeson                 as A
         import qualified Data.AttoLisp              as L
         import qualified Data.Attoparsec.ByteString as AP
@@ -114,6 +113,7 @@ with rec {
         import           Language.Haskell.TH.Syntax (lift, runIO)
         import qualified Numeric                    as N
         import qualified System.Environment         as Env
+        import           System.IO                  (hPutStr, stderr)
         import           System.IO.Unsafe           (unsafePerformIO)
 
         theoremDeps :: [(TheoremID, [Name])]
@@ -149,33 +149,71 @@ with rec {
                 nested []  = []
                 nested nns = nub (concatMap process nns)
 
-        addTruths :: A.Value -> Result
+        addTruths :: LB.ByteString -> Result
         addTruths x = mkResult ns
-          where ns = case A.fromJSON x of
-                       A.Success y -> Left y
-                       A.Error  e1 -> case A.fromJSON x of
-                                        A.Success ys -> Right ys
-                                        A.Error   e2 -> err e1 e2
-                err e1 e2 = error (show ("Couldn't decode", x, e1, e2))
+          where ns = case A.decode x of
+                       Just y  -> Left y
+                       Nothing -> case A.decode x of
+                                    Just ys -> Right ys
+                                    Nothing -> err
+                err = error ("Couldn't decode sample from: " ++ show x)
 
-        augmentObject :: A.Object -> A.Object
-        augmentObject = H.map go
-          where go v = case v of
-                         A.Array  a -> A.toJSON (addTruths v)
-                         A.Object o -> A.Object (augmentObject o)
-                         A.Null     -> A.Null
-                         _          -> error (show ("Unexpected entry", v))
+        augmentSize :: IO ()
+        augmentSize = BU.streamKeyVals go
+          where go key = do LB.putStr key
+                            LB.putStr " : "
+                            augmentRep
 
-        main = LB.interact (A.encode . go)
-          where go s = case A.eitherDecode s of
-                         Left  e            -> error e
-                         Right (A.Object o) -> A.Object (augmentObject o)
-                         Right x            -> error (show ("Bad parse", x))
+        -- We can't use streamKeyVals here, since reps may be null
+        augmentRep :: IO ()
+        augmentRep = do c <- BU.skipSpace
+                        case c of
+                          '{' -> putChar '{' >> go True
+                          'n' -> do 'u' <- getChar
+                                    'l' <- getChar
+                                    'l' <- getChar
+                                    LB.putStr "null"
+                          _   -> error (show (("Wanted", "'{' or 'null'"),
+                                              ("Got",    c)))
+          where go first = do mk <- BU.parseOne
+                              case mk of
+                                Nothing -> putChar '}' -- We've hit, and consumed, the '}'
+                                Just !k -> do if first
+                                                 then pure ()
+                                                 else putChar ','
+                                              f (BU.trimKey k)
+                                              go False
+                f key = do LB.putStr key
+                           LB.putStr " : "
+                           if key == "\"sample\""
+                              then do findColon
+                                      Just str <- BU.parseOne
+                                      LB.putStr (A.encode (addTruths str))
+                              else BU.streamKeyVals augmentRun
+
+        findColon = do c <- getChar
+                       case c of
+                         ':' -> pure ()
+                         _ | C.isSpace c -> findColon
+                         _ -> error ("Looking for ':' found " ++ show c)
+
+        augmentRun :: LB.ByteString -> IO ()
+        augmentRun key = do LB.putStr key
+                            LB.putStr " : "
+                            findColon
+                            Just str <- BU.parseOne
+                            LB.putStr (A.encode (addTruths str))
+
+        main = BU.streamKeyVals go
+          where go key = do LB.putStr key
+                            LB.putStr " : "
+                            augmentSize
       '';
     })
     ''
       cp "$helper" Helper.hs
       cp "$main"   Main.hs
+      cp "${../haskell-support/BucketUtil.hs}" BucketUtil.hs
       ghc --make -o Main Main.hs
       mv Main "$out"
     '';
@@ -193,43 +231,62 @@ with rec {
       smallSample = makeSamples { sizes = [ 2 ]; reps = 1; };
     }
     ''
+      echo -e "\nTesting non-JSON" 1>&2
       O=$(echo 'nope' | "$go" 2>&1) && fail "Non-JSON should error\n$O"
+      echo "Non-JSON passed" 1>&2
 
+      echo -e "\nTesting empty JSON object" 1>&2
       O=$(echo '{}'   | "$go") || fail "JSON object should work\n$O"
       [[ "x$O" = "x{}" ]]      || fail "Object should give '{}', got '$O'"
+      echo "Empty JSON object passed" 1>&2
 
+      echo -e "\nTesting JSON array" 1>&2
       O=$(echo '[]'   | "$go" 2>&1) && fail "JSON array should fail\n$O"
-      O=$(echo 'null' | "$go" 2>&1) && fail "JSON null should fail\n$O"
+      echo "JSON array passed" 1>&2
 
-      O=$(echo '{"x":[]}' | "$go") || fail "Non-empty object failed\n$O"
-      WANT='{"x":{"names":[],"theorems":[]}}'
+      echo -e "\nTesting JSON null" 1>&2
+      O=$(echo 'null' | "$go" 2>&1) && fail "JSON null should fail\n$O"
+      echo "JSON null passed" 1>&2
+
+      echo -e "\nTesting non-empty object" 1>&2
+      O=$(echo '{"1":{"2":{"sample":[]}}}' | "$go") ||
+        fail "Non-empty object failed\n$O"
+      WANT='{"1":{"2":{"sample":{"names":[],"theorems":[]}}}}'
       echo "$O" | jq -e --argjson want "$WANT" '. == $want' ||
         fail "Non-empty object should produce '$WANT', got '$O'"
       unset WANT
 
-      O=$(echo '{"x":["global64"]}' | "$go") || fail "Non-empty array failed"
-      echo "$O" | jq -e '.x | type | . == "object"' ||
-        fail "Non-empty array's 'x' should be object, got '$O'"
-      echo "$O" | jq -e '.x | has("names")' ||
-        fail "Non-empty array's 'x' should have 'names', got '$O'"
-      echo "$O" | jq -e '.x | has("theorems")' ||
-        fail "Non-empty array's 'x' should have 'theorems', got '$O'"
-      echo "$O" | jq -e '.x | .names | . == ["global64"]' ||
+      echo -e "\nTesting non-empty sample" 1>&2
+      O=$(echo '{"1":{"2":{"sample":["global64"]}}}' | "$go") ||
+        fail "Non-empty sample failed"
+      echo "$O" | jq -e '.["1"] | .["2"] | .sample | type | . == "object"' ||
+        fail "Non-empty sample should become an object, got '$O'"
+      echo "$O" | jq -e '.["1"] | .["2"] | .sample | has("names")' ||
+        fail "Non-empty sample should get 'names', got '$O'"
+      echo "$O" | jq -e '.["1"] | .["2"] | .sample | has("theorems")' ||
+        fail "Non-empty sample should have 'theorems', got '$O'"
+      echo "$O" | jq -e '.["1"] | .["2"] | .sample | .names |
+                                  . == ["global64"]' ||
         fail "Non-empty 'names' should match input '[\"global64\"]', got '$O'"
-      echo "$O" | jq -e '.x | .theorems | . == []' ||
+      echo "$O" | jq -e '.["1"] | .["2"] | .sample | .theorems | . == []' ||
         fail "Bogus names should get empty 'theorems', got '$O'"
+      echo "Non-empty sample passed" 1>&2
 
+      echo -e "\nTesting small sample" 1>&2
       O=$("$go" < "$smallSample") || fail "Didn't get small ground truths"
       echo "$O" | jq -e 'map(map(.sample | .theorems
                                          | length
                                          | . > 0) | all) | all' ||
-      fail "Small samples should have at least one theorem '$O'"
+        fail "Small samples should have at least one theorem '$O'"
+      echo "Small sample passed" 1>&2
 
+      echo -e "\nTesting larger sample" 1>&2
       O=$("$go" < "$samples") || fail "Didn't get ground truths of samples"
       echo "$O" | jq -e 'map(map(.sample | .theorems
                                          | length
                                          | . > 0) | all) | all' ||
         fail "Every sample should have at least one theorem '$O'"
+      echo "Larger sample passed" 1>&2
 
       mkdir "$out"
     '';
