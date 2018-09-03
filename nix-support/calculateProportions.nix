@@ -53,176 +53,83 @@ The purpose of this script is to calculate how much these 'unions of ground
 truths of buckets' differ from the 'ground truth of the union of buckets' (i.e.
 the full ground truth, if no bucketing were used).
 */
-{ fail, jq, python3, runCommand, withDeps, wrap }:
+{ fail, jq, nixpkgs1803, python3, runCommand, withDeps, wrap }:
 
 with builtins;
 with rec {
   cmd = wrap {
-    name   = "calculateProportions";
-    paths  = [ (python3.withPackages (p: [])) ];
-    vars   = { LANG = "en_US.UTF-8"; };
-    script = ''
-      #!/usr/bin/env python3
-      from functools import reduce
-      import json
-      import sys
-
-      ## Helpers
-
-      concat = lambda xs: reduce(lambda x, y: x + y, xs, [])
-
-      ## Data processors, one for each 'level'
-
-      def process(data):
-        assert type(data) == type({}), repr({
-          'error': 'Expected dictionary for "process"',
-          'given': data
-        })
-        return {s: processSize(x) for s, x in data.items()}
-
-      def processSize(data):
-        assert type(data) == type({}), repr({
-          'error': 'Expected dictionary for "processSize"',
-          'given': data
-        })
-        # Some reps are None ('null' in JSON) since they're dupes. Skip them.
-        return {r: x if x is None else processRep(x) for r, x in data.items()}
-
-      def processRep(data):
-        assert type(data) == type({}), repr({
-          'error': 'Expected dictionary for "processRep"',
-          'given': data
-        })
-        assert 'sample' in data, repr({
-          'error': 'Expected "sample" entry for "processRep"',
-          'given': data
-        })
-        return {m: x if m == 'sample' else processMethod(x, data['sample']) \
-                for m, x in data.items()}
-
-      def processMethod(data, sample):
-        assert type(data) == type({}), repr({
-          'error': 'Expected dictionary for "processMethod"',
-          'given': data
-        })
-        return {bs: processBuckets(x, sample) for bs, x in data.items()}
-
-      def processBuckets(data, sample):
-        assert type(data) == type({}), repr({
-          'error': 'Expected dictionary for "processBuckets"',
-          'given': data
-        })
-        assert 'names' in data, repr({
-          'error': 'Expected "names" entry for "processBuckets"',
-          'given': data
-        })
-        assert type(data['names']) == type([]), repr({
-          'error': 'Expected "names" to be a list in "processBuckets"',
-          'given': data
-        })
-        assert 'names' in sample, repr({
-          'error' : 'Expected "names" entry in sample for "processBuckets"',
-          'sample': sample,
-          'data'  : data
-        })
-        bucketNames = concat(data['names'])
-        assert sorted(bucketNames) == sorted(sample['names']), repr({
-          'error'       : 'Buckets do not contain all names',
-          'bucketNames' : bucketNames,
-          'sampleNames' : sample['names']
-        })
-
-        assert 'theorems' in data, repr({
-          'error': 'Expected "theorems" entry in "processBuckets"',
-          'given': data
-        })
-        bucketTheorems = data['theorems']
-        assert all((t in sample['theorems'] for t in bucketTheorems)), repr({
-          'error'          : 'Buckets have theorems from outside ground truth',
-          'bucketTheorems' : bucketTheorems,
-          'sampleTheorems' : sample['theorems'],
-          'sample'         : sample,
-          'data'           : data
-        })
-
-        found = len(bucketTheorems)
-        avail = len(sample['theorems'])
-        assert found <= avail, repr({
-          'error'  : 'Found more theorems than were available',
-          'avail'  : avail,
-          'found'  : found,
-          'data'   : data,
-          'sample' : sample
-        })
-
-        return dict(data, comparison={
-          'found'      : found,
-          'available'  : avail,
-          'missing'    : avail - found,
-          'proportion' : float(found) / float(avail)
-        })
-
-      given = sys.stdin.read()
-      try:
-        print(json.dumps(process(json.loads(given))))
-      except:
-        sys.stderr.write(repr({
-          'error': 'Failed to calculate proportions',
-          'stdin': given
-        }) + '\n')
-        raise
-    '';
+    name = "calculateProportions";
+    vars = { LANG = "en_US.UTF-8"; };
+    file = runCommand "calculateProportions"
+      {
+        buildInputs = [
+          (nixpkgs1803.haskellPackages.ghcWithPackages (h: [
+            h.bytestring h.data-msgpack h.text
+          ]))
+        ];
+        script = ../haskell-support/CalculateProportions.hs;
+      }
+      ''
+        cp "$script" Main.hs
+        ghc --make -O2 -o "$out" Main.hs
+      '';
   };
 
   test = runCommand "test-calculateProportions"
     {
       inherit cmd;
-      buildInputs = [ fail jq ];
+      buildInputs = [ fail jq nixpkgs1803.msgpack-tools ];
 
       noSample = toJSON {
         "1" = {
-          "1" = {
-            foo = {
-              "1" = {
-                names    = [ "x" ];
-                theorems = [ "y" ];
+          "1" = [
+            {
+              foo = {
+                "1" = {
+                  names    = [ "x" ];
+                  theorems = [ "y" ];
+                };
               };
-            };
-          };
+            }
+          ];
         };
       };
 
       nameError = toJSON {
         "1" = {
-          "1" = {
-            sample = {
-              names    = [ "n" ];
-              theorems = [ "t" ];
-            };
-            m = {
-              "1" = {
-                names    = [ ["n"] ["m"] ];
-                theorems = [             ];
+          "1" = [
+            {
+              sampleNames    = [ "n" ];
+              sampleTheorems = [ "t" ];
+            }
+            {
+              m = {
+                "1" = {
+                  names    = [ ["n"] ["m"] ];
+                  theorems = [             ];
+                };
               };
-            };
-          };
+            }
+          ];
         };
       };
 
       oneThird = toJSON {
         "1" = {
-          "1" = {
-            sample = {
-              names    = [     "n"     ];
-              theorems = [ "t" "u" "v" ];
-            };
-            m = {
-              "1" = {
-                names    = [ [ "n" ] ];
-                theorems = [   "u"   ];
+          "1" = [
+            {
+              sampleNames    = [     "n"     ];
+              sampleTheorems = [ "t" "u" "v" ];
+            }
+            {
+              m = {
+                "1" = {
+                  names    = [ [ "n" ] ];
+                  theorems = [   "u"   ];
+                };
               };
-            };
-          };
+            }
+          ];
           "2" = null;
         };
       };
@@ -231,20 +138,28 @@ with rec {
       set -o pipefail
       mkdir "$out"
 
-      O=$(echo '{}' | "$cmd" | tee "$out/empty.json") ||
+      function json {
+        echo "$*" | json2msgpack
+      }
+
+      function go {
+        "$cmd" "$@" | msgpack2json
+      }
+
+      O=$(json '{}' | go | tee "$out/empty.json") ||
         fail "Failed on empty object\n$O"
       echo "$O" | jq -e '. == {}' || fail "Wanted {}, got:\n$O"
 
-      O=$(echo "$noSample" | "$cmd" 2>&1 | tee "$out/nosample.json") &&
+      O=$(json "$noSample" | go 2>&1 | tee "$out/nosample.json") &&
         fail "Should've failed without 'sample'\n$O"
 
-      O=$(echo "$nameError" | "$cmd" 2>&1 | tee "$out/nameerror.json") &&
+      O=$(json "$nameError" | go 2>&1 | tee "$out/nameerror.json") &&
         fail "Should've failed with differing names\n$O"
 
-      O=$(echo "$oneThird" | "$cmd" | tee "$out/onethird.json") ||
+      O=$(json "$oneThird" | go | tee "$out/onethird.json") ||
         fail "Failed when given valid input\n$O"
 
-      C=$(echo "$O" | jq '.["1"] | .["1"] | .m | .["1"] | .comparison') ||
+      C=$(echo "$O" | jq '.["1"] | .["1"] | .[1] | .m | .["1"] | .comparison') ||
         fail "Couldn't extract comparison data from:\n$O"
       echo "$C" | jq -e '. == {"found"     :1,
                                "available" :3,
