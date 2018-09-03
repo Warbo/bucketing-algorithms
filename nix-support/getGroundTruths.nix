@@ -251,7 +251,7 @@ with rec {
       echo -e "\nTesting non-empty object" 1>&2
       O=$(echo '{"1":{"2":{"sample":[]}}}' | "$go") ||
         fail "Non-empty object failed\n$O"
-      WANT='{"1":{"2":{"sample":{"names":[],"theorems":[]}}}}'
+      WANT='{"1":{"2":[{"sampleNames":[],"sampleTheorems":[]}]}}'
       echo "$O" | jq -e --argjson want "$WANT" '. == $want' ||
         fail "Non-empty object should produce '$WANT', got '$O'"
       unset WANT
@@ -259,32 +259,32 @@ with rec {
       echo -e "\nTesting non-empty sample" 1>&2
       O=$(echo '{"1":{"2":{"sample":["global64"]}}}' | "$go") ||
         fail "Non-empty sample failed"
-      echo "$O" | jq -e '.["1"] | .["2"] | .sample | type | . == "object"' ||
+      echo "$O" | jq -e '.["1"] | .["2"] | .[0] | type | . == "object"' ||
         fail "Non-empty sample should become an object, got '$O'"
-      echo "$O" | jq -e '.["1"] | .["2"] | .sample | has("names")' ||
-        fail "Non-empty sample should get 'names', got '$O'"
-      echo "$O" | jq -e '.["1"] | .["2"] | .sample | has("theorems")' ||
-        fail "Non-empty sample should have 'theorems', got '$O'"
-      echo "$O" | jq -e '.["1"] | .["2"] | .sample | .names |
+      echo "$O" | jq -e '.["1"] | .["2"] | .[0] | has("sampleNames")' ||
+        fail "Non-empty sample should get 'sampleNames', got '$O'"
+      echo "$O" | jq -e '.["1"] | .["2"] | .[0] | has("sampleTheorems")' ||
+        fail "Non-empty sample should have 'sampleTheorems', got '$O'"
+      echo "$O" | jq -e '.["1"] | .["2"] | .[0] | .sampleNames |
                                   . == ["global64"]' ||
-        fail "Non-empty 'names' should match input '[\"global64\"]', got '$O'"
-      echo "$O" | jq -e '.["1"] | .["2"] | .sample | .theorems | . == []' ||
-        fail "Bogus names should get empty 'theorems', got '$O'"
+        fail "'sampleNames' should match input '[\"global64\"]', got '$O'"
+      echo "$O" | jq -e '.["1"] | .["2"] | .[0] | .sampleTheorems | . == []' ||
+        fail "Bogus names should get empty 'sampleTheorems', got '$O'"
       echo "Non-empty sample passed" 1>&2
 
       echo -e "\nTesting small sample" 1>&2
       O=$("$go" < "$smallSample") || fail "Didn't get small ground truths"
-      echo "$O" | jq -e 'map(map(.sample | .theorems
-                                         | length
-                                         | . > 0) | all) | all' ||
+      echo "$O" | jq -e 'map(map(.[0] | .sampleTheorems
+                                      | length
+                                      | . > 0) | all) | all' ||
         fail "Small samples should have at least one theorem '$O'"
       echo "Small sample passed" 1>&2
 
       echo -e "\nTesting larger sample" 1>&2
       O=$("$go" < "$samples") || fail "Didn't get ground truths of samples"
-      echo "$O" | jq -e 'map(map(.sample | .theorems
-                                         | length
-                                         | . > 0) | all) | all' ||
+      echo "$O" | jq -e 'map(map(.[0] | .sampleTheorems
+                                      | length
+                                      | . > 0) | all) | all' ||
         fail "Every sample should have at least one theorem '$O'"
       echo "Larger sample passed" 1>&2
 
