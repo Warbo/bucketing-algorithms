@@ -79,6 +79,9 @@ with rec {
     hs.ML4HSFE
     hs.process
     hs.process-extras
+    hs.QuickCheck
+    hs.tasty
+    hs.tasty-quickcheck
     hs.text
     hs.th-lift-instances
     hs.unordered-containers
