@@ -1,153 +1,110 @@
-{ calculateProportions, fail, jq, python3, runCommand, withDeps, wrap }:
+{ calculateProportions, fail, jq, msgpack-tools, nixpkgs1803, runCommand,
+  withDeps, wrap, writeScript }:
 
 with builtins;
 with rec {
   cmd = wrap {
-    name   = "averageProportions";
-    paths  = [ (python3.withPackages (p: [])) ];
-    vars   = { LANG = "en_US.UTF-8"; };
-    script = ''
-      #!/usr/bin/env python3
-      from functools import reduce
-      import json
-      import math
-      import sys
-
-      concat = lambda xs: reduce(lambda x, y: x + y, xs, [])
-
-      dropDupes = lambda d: list(filter(lambda k: d[k] is not None, d.keys()))
-
-      def process(data):
-        assert type(data) == type({}), repr({
-          'error' : 'Expected dictionary in "process"',
-          'given' : data
-        })
-        return {s: processSize(x) for s, x in data.items()}
-
-      def processSize(data):
-        assert type(data) == type({}), repr({
-          'error' : 'Expected dictionary in "processSize"',
-          'given' : data
-        })
-        noDupes = dropDupes(data)
-        methods = list(set(concat([list(data[rep].keys()) for rep in noDupes])))
-        return {m: processMethod(data, m) for m in methods if m != "sample"}
-
-      def processMethod(data, method):
-        assert type(data) == type({}), repr({
-          'error'  : 'Expected "data" to be dictionary in "processMethod"',
-          'data'   : data,
-          'method' : method
-        })
-        assert type(method) == type(""), repr({
-          'error'  : 'Expected "method" to be string in "processMethod"',
-          'data'   : data,
-          'method' : method
-        })
-        noDupes     = dropDupes(data)
-        bucketSizes = [list(data[rep][method].keys()) for rep in noDupes]
-        bucketSizes = list(set(concat(bucketSizes)))
-        return {bs: processBucketSize(data, method, bs) for bs in bucketSizes}
-
-      def processBucketSize(data, method, bSize):
-        assert type(data) == type({}), repr({
-          'error'  : 'Expected "data" to be dictionary in "processBucketSize"',
-          'data'   : data,
-          'method' : method,
-          'bSize'  : bSize
-        })
-        noDupes     = dropDupes(data)
-        proportions = [data[rep][method][bSize]['comparison']['proportion'] \
-                       for rep in noDupes]
-
-        count    = float(len(proportions))
-        mean     = float(sum(proportions)) / count
-        variance = sum([float(p - mean)**2 for p in proportions]) / (count - 1)
-        stddev   = math.sqrt(variance)
-        return {'proportion': {'mean'  : mean,
-                               'stddev': stddev}}
-
-      given = sys.stdin.read()
-      try:
-        print(json.dumps(process(json.loads(given))))
-      except:
-        sys.stderr.write(repr({
-          'error' : 'Failed to average',
-          'stdin' : given
-        }) + '\n')
-        raise
-    '';
+    name  = "averageProportions";
+    vars  = { LANG = "en_US.UTF-8"; };
+    file  = runCommand "average-proportions"
+      {
+        buildInputs = [
+          (nixpkgs1803.haskellPackages.ghcWithPackages (h: [
+            h.bytestring h.containers h.data-msgpack h.text
+          ]))
+        ];
+        main = ../haskell-support/AverageProportions.hs;
+      }
+      ''
+        cp "$main" Main.hs
+        ghc --make -O2 -o "$out" Main.hs
+      '';
   };
 
   test = runCommand "test-averageProportions"
     {
-      inherit cmd;
-      buildInputs = [ fail jq ];
-      example     = toJSON {
+      inherit calculateProportions cmd;
+      buildInputs = [ fail jq msgpack-tools ];
+      example     = writeScript "example.json" (toJSON {
         "1" = {
-          "1" = {
-            sample = {
-              names =    [    "n"    ];
-              theorems = [ "t1" "t2" ];
-            };
-            a = {
-              "1" = {
-                names =    [ [ "n" ] ];
-                theorems = [   "t1"  ];
+          "1" = [
+            {
+              sampleNames    = [    "n"    ];
+              sampleTheorems = [ "t1" "t2" ];
+            }
+            {
+              a = {
+                "1" = {
+                  names    = [ [ "n" ] ];
+                  theorems = [   "t1"  ];
+                };
+                "2" = {
+                  names    = [  [ "n" ]  ];
+                  theorems = [ "t1" "t2" ];
+                };
               };
-              "2" = {
-                names =    [  [ "n" ]  ];
-                theorems = [ "t1" "t2" ];
+              b = {
+                "1" = {
+                  names    = [ [ "n" ] ];
+                  theorems = [         ];
+                };
+                "2" = {
+                  names    = [ [ "n" ] ];
+                  theorems = [   "t2"  ];
+                };
               };
-            };
-            b = {
-              "1" = {
-                names    = [ [ "n" ] ];
-                theorems = [         ];
+            }
+          ];
+          "2" = [
+            {
+              sampleNames    = [ "n2" ];
+              sampleTheorems = [ "t3" ];
+            }
+            {
+              a = {
+                "1" = {
+                  names    = [ [ "n2" ] ];
+                  theorems = [   "t3"   ];
+                };
+                "2" = {
+                  names    = [ [ "n2" ] ];
+                  theorems = [   "t3"   ];
+                };
               };
-              "2" = {
-                names    = [ [ "n" ] ];
-                theorems = [   "t2"  ];
+              b = {
+                "1" = {
+                  names    = [ [ "n2" ] ];
+                  theorems = [          ];
+                };
+                "2" = {
+                  names    = [ [ "n2" ] ];
+                  theorems = [   "t3"   ];
+                };
               };
-            };
-          };
-          "2" = {
-            sample = {
-              names    = [ "n2" ];
-              theorems = [ "t3" ];
-            };
-            a = {
-              "1" = {
-                names    = [ [ "n2" ] ];
-                theorems = [   "t3"   ];
-              };
-              "2" = {
-                names    = [ [ "n2" ] ];
-                theorems = [   "t3"   ];
-              };
-            };
-            b = {
-              "1" = {
-                names    = [ [ "n2" ] ];
-                theorems = [          ];
-              };
-              "2" = {
-                names    = [ [ "n2" ] ];
-                theorems = [   "t3"   ];
-              };
-            };
-          };
+            }
+          ];
           "3" = null;
         };
-      };
+      });
     }
     ''
-      O=$(echo '{}' | "$cmd") || fail "Failed on empty input\n$O"
+      O=$(echo '{}' | json2msgpack | "$cmd") || fail "Failed on empty input\n$O"
 
-      PS=$(echo "$example" | "${calculateProportions}") ||
+      # NOTE: Do not try storing msgpack in Bash variables, since NULL bytes
+      # will cause problems. Instead, we always convert to JSON, even if it
+      # causes a bunch of round trips.
+      PS=$(json2msgpack < "$example" |
+           "$calculateProportions"   |
+           msgpack2json) ||
         fail "Couldn't calculate proportions\n$PS"
 
-      O=$(echo "$PS" | "$cmd") || fail "Couldn't average. In:\n$PS\nOut:\n$O"
+      echo "$PS" | jq 'type' || {
+        echo "$PS" | msgpack2json -d || true
+        fail "Didn't calculate msgpack\n$PS"
+      }
+
+      O=$(echo "$PS" | json2msgpack | "$cmd" | msgpack2json) ||
+        fail "Couldn't average. In:\n$PS\nOut:\n$O"
 
       echo "$O" | jq -e '.["1"] | keys | sort | . == ["a", "b"]' ||
         fail "Didn't have methods 'a' and 'b'\n$O"
