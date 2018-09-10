@@ -53,7 +53,7 @@ The purpose of this script is to calculate how much these 'unions of ground
 truths of buckets' differ from the 'ground truth of the union of buckets' (i.e.
 the full ground truth, if no bucketing were used).
 */
-{ fail, jq, nixpkgs1803, python3, runCommand, withDeps, wrap }:
+{ fail, jq, msgpack-tools, nixpkgs1803, python3, runCommand, withDeps, wrap }:
 
 with builtins;
 with rec {
@@ -71,14 +71,14 @@ with rec {
       }
       ''
         cp "$script" Main.hs
-        ghc --make -O2 -o "$out" Main.hs
+        ghc --make -o "$out" Main.hs
       '';
   };
 
   test = runCommand "test-calculateProportions"
     {
       inherit cmd;
-      buildInputs = [ fail jq nixpkgs1803.msgpack-tools ];
+      buildInputs = [ fail jq msgpack-tools ];
 
       noSample = toJSON {
         "1" = {

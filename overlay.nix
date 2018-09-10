@@ -71,6 +71,9 @@ with rec {
       # Old URL seems to be down
       moreutils
 
+      # Not available in old versions
+      msgpack-tools
+
       # Provides subprocess.run and withPackages
       python python3 python3Packages;
 

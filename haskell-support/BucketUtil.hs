@@ -173,7 +173,9 @@ processSize  opts size = do LBS.putStr (LBS.filter (/= ',') size)
                             putChar ':'
                             processKeyVals (processRep' opts size)
 
-processRep' :: (_, _) -> LBS.ByteString -> LBS.ByteString -> LBS.ByteString
+type Args = ([Name] -> [AST], [Bucketer])
+
+processRep' :: Args -> LBS.ByteString -> LBS.ByteString -> LBS.ByteString
             -> IO ()
 processRep' (astsOf, bucketers) size !key !bs =
     do putErr (LBS.concat ["Size ", size, " rep ", key, "\n"])
@@ -186,7 +188,14 @@ processRep' (astsOf, bucketers) size !key !bs =
                            _            -> error (show (("Error",
                                                          "Not rep or null"),
                                                         ("Given", bs')))
-               Right (Rep smp bkt) -> A.encode (Rep smp (addBuckets smp bkt))
+               Right (Rep ns bkt) -> A.encode [A.object ["sampleNames" A..= ns],
+                                               bktObj (addBuckets ns bkt)      ]
+
+        bktObj = let meth (Method m, bktd) = m A..= A.object
+                                                      (map size
+                                                           (Map.toList bktd))
+                     size (i, ns) = T.pack (show i) A..= map (map unName) ns
+                  in A.object . map meth . Map.toList
 
         bs' = LBS.dropWhile notStart bs
 
@@ -236,7 +245,10 @@ streamKeyVals :: (LBS.ByteString -> IO ()) -> IO ()
 streamKeyVals f = do c <- skipSpace
                      case c of
                        '{' -> putChar '{' >> go True
-                       _   -> error (show (("Wanted", '{'), ("Got", c)))
+                       _   -> do rest <- LBS.getContents
+                                 error (show (("Wanted", '{'             ),
+                                              ("Got"   , c               ),
+                                              ("Rest"  , LBS.take 50 rest)))
   where go first = do mk <- parseOne
                       case mk of
                         Nothing -> putChar '}' -- We've hit, and consumed, the '}'
