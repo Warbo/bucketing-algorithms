@@ -26,7 +26,7 @@ import           Debug.Trace                (trace)
 import           GHC.Generics               (Generic)
 import qualified HS2AST.Types               as HT
 import           System.Environment         (lookupEnv)
-import           System.IO                  (stderr)
+import           System.IO                  (hPutStrLn, stderr)
 import           System.IO.Unsafe           (unsafePerformIO)
 
 newtype Name = Name IT.InternedText
@@ -158,6 +158,25 @@ astToId x = HT.ID { HT.idPackage = p, HT.idModule = m , HT.idName = n }
 
 -- Streaming JSON parsing/printing
 
+-- This type lets us avoid hard-coding IO, so that we can test some functions
+-- more easily
+data StreamImp m = StreamImp {
+    getchar     ::                   m Char
+  , getcontents ::                   m LBS.ByteString
+  , info        ::         String -> m ()
+  , putchar     ::           Char -> m ()
+  , putstr      :: LBS.ByteString -> m ()
+  }
+
+-- Specialises StreamImp to IO
+io = StreamImp {
+    getchar     = getChar
+  , getcontents = LBS.getContents
+  , info        = hPutStrLn stderr
+  , putchar     = putChar
+  , putstr      = LBS.putStr
+  }
+
 bucketStdio :: [Bucketer] -> ([TL.Text] -> [TL.Text]) -> IO ()
 bucketStdio brs f = processSizes (astsOf f, brs)
 
@@ -209,10 +228,12 @@ processRep' (astsOf, bucketers) size !key !bs =
         notStart _   = True
 
 -- Return the next non-space Char from stdin; treat : and , as whitespace
-skipSpace = do c <- getChar
-               if C.isSpace c || c `elem` (":," :: String)
-                  then skipSpace
-                  else pure c
+skipSpace = skipSpace' io
+
+skipSpace' imp = do c <- getchar imp
+                    if C.isSpace c || c `elem` (":," :: String)
+                       then skipSpace' imp
+                       else pure c
 
 trimKey = LBS.reverse . go . LBS.reverse . go
   where go = LBS.dropWhile (/= '"')
@@ -242,19 +263,22 @@ processKeyVals f = do c <- skipSpace
 -- key, then repeats (f is responsible for reading the value); stops once the
 -- corresponding '}' gets read.
 streamKeyVals :: (LBS.ByteString -> IO ()) -> IO ()
-streamKeyVals f = do c <- skipSpace
-                     case c of
-                       '{' -> putChar '{' >> go True
-                       _   -> do rest <- LBS.getContents
-                                 error (show (("Wanted", '{'             ),
-                                              ("Got"   , c               ),
-                                              ("Rest"  , LBS.take 50 rest)))
-  where go first = do mk <- parseOne
+streamKeyVals f = streamKeyVals' io f
+
+streamKeyVals' :: Monad m => StreamImp m -> (LBS.ByteString -> m ()) -> m ()
+streamKeyVals' imp f = do c <- skipSpace' imp
+                          case c of
+                            '{' -> putchar imp '{' >> go True
+                            _   -> do rest <- getcontents imp
+                                      error (show (("Wanted", '{'             ),
+                                                   ("Got"   , c               ),
+                                                   ("Rest"  , LBS.take 50 rest)))
+  where go first = do mk <- parseOne' imp
                       case mk of
-                        Nothing -> putChar '}' -- We've hit, and consumed, the '}'
+                        Nothing -> putchar imp '}' -- We've hit, and consumed, the '}'
                         Just !k -> do if first
                                          then pure ()
-                                         else putChar ','
+                                         else putchar imp ','
                                       f (trimKey k)
                                       go False
 
@@ -268,53 +292,59 @@ data Container = CObject | CArray | CString
 data ParseState = PSTop | PSInside !Container !ParseState
 
 parseOne :: IO (Maybe LBS.ByteString)
-parseOne = getChar >>= go LBS.empty PSTop
-  where go !bs s c = case (s, c) of
+parseOne = parseOne' io
+
+parseOne' :: Monad m => StreamImp m -> m (Maybe LBS.ByteString)
+parseOne' imp = getchar imp >>= go LBS.empty PSTop
+  where snocTo   bs c   = pure $! (Just $! LBS.snoc bs c)
+
+        readSnoc bs c s = getchar imp >>= go (LBS.snoc bs c) s
+
+        go !bs s c = case (s, c) of
           -- Pop the state when we see our closing delimiter; return if finished
-          (PSInside CObject PSTop, '}') -> pure $! (Just $! LBS.snoc bs '}')
-          (PSInside CObject s'   , '}') -> getChar >>= go (LBS.snoc bs '}') s'
-          (PSInside CArray  PSTop, ']') -> pure $! (Just $! LBS.snoc bs ']')
-          (PSInside CArray  s'   , ']') -> getChar >>= go (LBS.snoc bs ']') s'
-          (PSInside CString PSTop, '"') -> pure $! (Just $! LBS.snoc bs '"')
-          (PSInside CString s'   , '"') -> getChar >>= go (LBS.snoc bs '"') s'
+          (PSInside CObject PSTop, '}') -> snocTo   bs '}'
+          (PSInside CObject s'   , '}') -> readSnoc bs '}' s'
+          (PSInside CArray  PSTop, ']') -> snocTo   bs ']'
+          (PSInside CArray  s'   , ']') -> readSnoc bs ']' s'
+          (PSInside CString PSTop, '"') -> snocTo   bs '"'
+          (PSInside CString s'   , '"') -> readSnoc bs '"' s'
 
           -- Fail if we've hit the end of a container we're not in
           (PSTop, '}') -> pure Nothing
           (PSTop, ']') -> pure Nothing
 
           -- Special case to handle escaped quotes and escaped escapes
-          (PSInside CString s', '\\') -> do c' <- getChar
-                                            getChar >>= go (LBS.snoc
-                                                             (LBS.snoc bs c) c')
-                                                           s
+          (PSInside CString s', '\\') -> do c' <- getchar imp
+                                            getchar imp >>=
+                                              go (LBS.snoc (LBS.snoc bs c) c') s
 
           -- Skip everything else if we're in a string
-          (PSInside CString _, _) -> getChar >>= go (LBS.snoc bs c) s
+          (PSInside CString _, _) -> getchar imp >>= go (LBS.snoc bs c) s
 
           -- Always skip whitespace
-          _ | C.isSpace c -> getChar >>= go (LBS.snoc bs c) s
+          _ | C.isSpace c -> getchar imp >>= go (LBS.snoc bs c) s
 
           -- Skip over ':' and ',' as if they're whitespace
-          (_, ':') -> getChar >>= go (LBS.snoc bs c) s
-          (_, ',') -> getChar >>= go (LBS.snoc bs c) s
+          (_, ':') -> readSnoc bs c s
+          (_, ',') -> readSnoc bs c s
 
           -- Accept null as a value
-          (_, 'n') -> do ['u', 'l', 'l'] <- replicateM 3 getChar
+          (_, 'n') -> do ['u', 'l', 'l'] <- replicateM 3 (getchar imp)
                          pure $! (Just $! L.foldl' LBS.snoc bs
                                                    ("null" :: String))
 
           -- Skip over numbers
-          _ | C.isDigit c -> getChar >>= go (LBS.snoc bs c) s
+          _ | C.isDigit c -> readSnoc bs c s
 
           -- Skip over true
-          (_, 't') -> do cs <- replicateM 3 getChar
-                         getChar >>= go (L.foldl' LBS.snoc bs cs) s
+          (_, 't') -> do cs <- replicateM 3 (getchar imp)
+                         getchar imp >>= go (L.foldl' LBS.snoc bs cs) s
 
           -- Skip over false
-          (_, 'f') -> do cs <- replicateM 4 getChar
-                         getChar >>= go (L.foldl' LBS.snoc bs cs) s
+          (_, 'f') -> do cs <- replicateM 4 (getchar imp)
+                         getchar imp >>= go (L.foldl' LBS.snoc bs cs) s
 
           -- Match an opening delimiter
-          (_, '{') -> getChar >>= go (LBS.snoc bs '{') (PSInside CObject s)
-          (_, '[') -> getChar >>= go (LBS.snoc bs '[') (PSInside CArray  s)
-          (_, '"') -> getChar >>= go (LBS.snoc bs '"') (PSInside CString s)
+          (_, '{') -> readSnoc bs '{' (PSInside CObject s)
+          (_, '[') -> readSnoc bs '[' (PSInside CArray  s)
+          (_, '"') -> readSnoc bs '"' (PSInside CString s)
