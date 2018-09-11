@@ -48,7 +48,7 @@ with rec {
 
           echo "Converting JSON to MsgPack" 1>&2
           S=$(stat --printf="%s" "$f")
-          json2msgpack extracted.json | lzip | pv -f -p -e -s "$S" > "$out"
+          json2msgpack < extracted.json | lzip | pv -f -p -e -s "$S" > "$out"
         '';
 
       "withBucketsGroundTruthsProportions.msgpack.lz" =
