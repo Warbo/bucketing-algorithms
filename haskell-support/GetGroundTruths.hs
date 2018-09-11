@@ -20,28 +20,38 @@ import qualified Numeric                    as N
 import qualified System.Environment         as Env
 import           System.IO.Unsafe           (unsafePerformIO)
 
-theoremDeps :: [(TheoremID, [Name])]
-theoremDeps =
-  $(let name = "BENCHMARKS_THEOREM_DEPS"
+theoremDeps :: [(TheoremID, AscendingList Name)]
+theoremDeps = map wrapSecond unwrapped
+  where -- At run time we convert each (already sorted) list of deps into an
+        -- 'AscendingList'. This is a newtype so there's minimal overhead.
+        wrapSecond (t, deps) = (t, AscendingList deps)
 
-        lispToData l = case L.parseEither L.parseLisp l of
-                         Left  e -> error e
-                         Right d -> d
+        -- Build the datastructure at compile time, including sorting the deps
+        -- into ascending order. There's no 'Lift' instance for 'AscendingList'
+        -- so we leave them as regular lists.
+        unwrapped =
+          $(let name = "BENCHMARKS_THEOREM_DEPS"
 
-        strToData :: B.ByteString -> [(TheoremID, [Name])]
-        strToData  s = case AP.parseOnly (L.lisp <* AP.endOfInput) s of
-                         Left  e -> error e
-                         Right l -> lispToData l
+                lispToData l = case L.parseEither L.parseLisp l of
+                                 Left  e -> error e
+                                 Right d -> d
 
-     in do mp <- runIO (Env.lookupEnv name)
-           s  <- case mp of
-                   Nothing -> error ("Env doesn't contain " ++ name)
-                   Just p  -> runIO (B.readFile p)
-           lift (strToData s))
+                strToData :: B.ByteString -> [(TheoremID, [Name])]
+                strToData  s = case AP.parseOnly (L.lisp <* AP.endOfInput) s of
+                                 Left  e -> error e
+                                 Right l -> lispToData l
 
-theoremFilesAdmittedBy :: [Name] -> [TheoremID]
+                sortSecond (t, deps) = (t, List.sort deps)
+
+             in do mp <- runIO (Env.lookupEnv name)
+                   s  <- case mp of
+                           Nothing -> error ("Env doesn't contain " ++ name)
+                           Just p  -> runIO (B.readFile p)
+                   lift (map sortSecond (strToData s)))
+
+theoremFilesAdmittedBy :: AscendingList Name -> [TheoremID]
 theoremFilesAdmittedBy sample = map fst (filter match theoremDeps)
-  where match td = snd td `subset` sample
+  where match td = snd td `subsetAsc` sample
 
 mkResult :: LB.ByteString -> Result
 mkResult = mkResult' . Right . M.fromJust . A.decode
@@ -53,7 +63,8 @@ mkResult' :: Either [Name] [[Name]] -> Result
 mkResult' ns = R { names = ns, theorems = either process nested ns }
   where process :: [Name] -> [TheoremID]
         process [] = []
-        process ns = theoremFilesAdmittedBy (map decodeName ns)
+        process ns = theoremFilesAdmittedBy (mkAscendingList (map decodeName
+                                                                  ns))
 
         nested :: [[Name]] -> [TheoremID]
         nested []  = []
