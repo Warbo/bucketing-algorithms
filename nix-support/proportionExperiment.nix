@@ -65,7 +65,7 @@ with rec {
     results = attrsToDirs' "proportion-experiment-${label}" steps;
   };
 
-  test = go { label = "test"; maxSize = 2; reps = 30; };
+  test = go { label = "test"; maxSize = 5; reps = 30; };
 };
 {
   inherit test;
