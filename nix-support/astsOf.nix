@@ -32,7 +32,7 @@ with rec {
     ''
       cp -v "$modules"/*.hs ./
       cp "$main" Main.hs
-      ghc --make Main.hs -o "$out"
+      ghc --make -O2 -o "$out" Main.hs
     '';
 
   test = runCommand "test-astsOf"

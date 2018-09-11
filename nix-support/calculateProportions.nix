@@ -71,7 +71,7 @@ with rec {
       }
       ''
         cp "$script" Main.hs
-        ghc --make -o "$out" Main.hs
+        ghc --make -O2 -o "$out" Main.hs
       '';
   };
 

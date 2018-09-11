@@ -31,6 +31,6 @@
   ''
     cp -v "$files"/* ./
     cp -v "$main" Main.hs
-    ghc --make -o Main Main.hs
+    ghc --make -O2 -o Main Main.hs
     mv Main "$out"
   ''

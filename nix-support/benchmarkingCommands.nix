@@ -49,7 +49,7 @@ rec {
           "RecurrentBucket.hs" = ../haskell-support/RecurrentBucket.hs;
         }}"/* ./
         cp -v "$main" Main.hs
-        ghc --make -o "$out" Main.hs
+        ghc --make -O2 -o "$out" Main.hs
       '';
   };
 

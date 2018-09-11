@@ -39,7 +39,7 @@ with rec {
         cp -rv "$mods" mods
         chmod +w -R mods
         cd mods
-        ghc --make -o "$out" Main.hs
+        ghc --make ${if profile then "" else "-O2"} -o "$out" Main.hs
         ${if profile
              /* Only compile for profiling after we've done a normal compile, so
                 GHC finds unprofiled TemplateHaskell snippets it can run (it
