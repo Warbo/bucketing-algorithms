@@ -19,7 +19,7 @@ import           System.IO.Unsafe           (unsafePerformIO)
 
 type TheoremID = String
 
-newtype Name = N T.Text deriving (Eq, Show)
+newtype Name = N T.Text deriving (Eq, Ord, Show)
 
 instance Lift Name where
   lift (N n) = do arg <- lift (T.unpack n)
@@ -50,8 +50,24 @@ instance L.FromLisp TheoremDeps where
                    pure (TDs (map toPair tds))
     where toPair [Left id, Right deps] = (id, deps)
 
-subset []     ys = True
-subset (x:xs) ys = (x `elem` ys) && (xs `subset` ys)
+-- Lists which we assume are sorted
+newtype AscendingList a = AscendingList [a]
+
+mkAscendingList :: Ord a => [a] -> AscendingList a
+mkAscendingList = AscendingList . List.sort
+
+subsetAsc :: Ord a => AscendingList a -> AscendingList a -> Bool
+subsetAsc (AscendingList xs) = subset xs
+
+subset :: Ord a => [a] -> AscendingList a -> Bool
+subset xs ays@(AscendingList ys) = case xs of
+    []     -> True
+    (x:xs) -> (x `isIn` ys) && (xs `subset` ays)
+  where x `isIn` []     = False
+        x `isIn` (y:ys) = case x `compare` y of
+                            LT -> False  -- x < y implies all (x <) ys
+                            EQ -> True
+                            GT -> x `isIn` ys
 
 decodeName (N n) = case M.catMaybes [T.stripPrefix "global" n,
                                      T.stripPrefix "Global" n] of

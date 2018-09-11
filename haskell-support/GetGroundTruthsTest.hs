@@ -26,6 +26,23 @@ findColon = testProperty "Can find :" go
                                 out      x === ""                .&&.
                                 err      x === []
 
+subset = testGroup "Can find subsets" [
+      testProperty     "Subsets are spotted" spotSubsets,
+      testProperty "Non-subsets are spotted" spotNonSubsets
+    ]
+  where spotSubsets :: Int -> [Int] -> [Int] -> Property
+        spotSubsets x xs indices =
+          let super  = nub (x:xs)
+              super' = Helper.mkAscendingList super
+              sub    = nub (map get indices)
+              get i  = super !! (abs i `mod` length super)
+           in counterexample (show (("sub", sub), ("super", super)))
+                (property (sub `Helper.subset` super'))
+
+        spotNonSubsets :: [Int] -> [Int] -> Property
+        spotNonSubsets xs ys = not (null (filter (`notElem` ys) xs)) ==>
+          property (not (xs `Helper.subset` (Helper.mkAscendingList ys)))
+
 runOn f s = runState (f testImp) (startState s)
 
 genSpace :: Int -> Gen String
