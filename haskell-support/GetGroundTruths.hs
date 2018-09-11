@@ -61,7 +61,7 @@ mkResult' ns = R { names = ns, theorems = either process nested ns }
 
 augmentSize :: Monad m => BU.StreamImp m -> m ()
 augmentSize imp = BU.streamKeyVals' imp go
-  where go key = do --info ("Found rep " ++ show key)
+  where go key = do info imp ("Found rep " ++ show key)
                     putstr imp key
                     putstr imp " : "
                     augmentRep imp
@@ -70,13 +70,13 @@ augmentSize imp = BU.streamKeyVals' imp go
 augmentRep :: Monad m => BU.StreamImp m -> m ()
 augmentRep imp = do c <- BU.skipSpace' imp
                     case c of
-                      '[' -> do --info "Rep is an array"
+                      '[' -> do info imp "Rep is an array"
                                 putchar imp '['
                                 goArray imp
                       'n' -> do 'u' <- getchar imp
                                 'l' <- getchar imp
                                 'l' <- getchar imp
-                                --info "Rep is null"
+                                info imp "Rep is null"
                                 putstr imp "null"
                       _   -> error (show (("Wanted", "'[' or 'null'"),
                                           ("Got",    c)))
@@ -138,9 +138,9 @@ augmentRun imp key = do info imp ("Found run " ++ show key)
                         putstr imp (A.encode (mkResult str))
 
 main' imp = BU.streamKeyVals' imp go
-  where go key = do info imp ("Found size " ++ show key)
-                    putstr imp key
-                    putstr imp " : "
-                    augmentSize imp
+  where go !key = do info imp ("Found size " ++ show key)
+                     putstr imp key
+                     putstr imp " : "
+                     augmentSize imp
 
 mainIO = main' BU.io
