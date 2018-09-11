@@ -98,6 +98,7 @@ goArray imp = do -- First entry is {"sampleNames":[...]}
                  putchar imp '{'
                  go True
                  info imp "Closing off array"
+                 ']' <- BU.skipSpace' imp
                  putchar imp ']'
 
   where go first = do info imp ("Looking for " ++ (if first
