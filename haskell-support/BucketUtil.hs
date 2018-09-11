@@ -168,11 +168,17 @@ data StreamImp m = StreamImp {
   , putstr      :: LBS.ByteString -> m ()
   }
 
+debug :: String -> IO ()
+debug msg = do shouldDebug <- lookupEnv "DEBUG"
+               case shouldDebug of
+                 Just "1" -> hPutStrLn stderr msg
+                 _        -> pure ()
+
 -- Specialises StreamImp to IO
 io = StreamImp {
     getchar     = getChar
   , getcontents = LBS.getContents
-  , info        = hPutStrLn stderr
+  , info        = debug
   , putchar     = putChar
   , putstr      = LBS.putStr
   }
