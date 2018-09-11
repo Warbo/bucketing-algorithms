@@ -14,6 +14,10 @@ def load_samples():
                 samples[size][rep] = dumps(sample['sample'])
     return samples
 
+def load_bucketed():
+    with open(getenv('bucketed'), 'r') as f:
+        return loads(f.read())
+
 def load_command(c):
     return loads(getenv('commands'))[c]
 

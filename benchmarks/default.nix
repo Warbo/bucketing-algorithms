@@ -121,11 +121,20 @@ fixed.mkBin {
       };
     };
 
-    # A fixed set of samples, for scripts which need them as input
-    samples = fixed.makeSamples {
-      sizes = [ 1 5 10 15 20 ];
-      reps  = 5;
-    };
+    inherit (rec {
+      # A fixed set of samples, for scripts which need them as input
+      samples = fixed.makeSamples {
+        sizes = [ 1 5 10 15 20 ];
+        reps  = 5;
+      };
+
+      # Samples with buckets, for those which need them. Note that this wraps
+      # each sample in an array, so that we're guaranteed to read the sampled
+      # names before the bucketing results, which allows us to be streaming.
+      bucketed = with fixed; runOn "bucketed.json"
+                                   bucketProportions.addBuckets
+                                   samples;
+    }) bucketed samples ;
   };
   script = ''
     #!/usr/bin/env bash
