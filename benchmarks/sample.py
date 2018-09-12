@@ -6,4 +6,5 @@ cmd = load_command('sample')
 def time_sample():
     run_on([cmd], "")
 
-time_sample.timer = default_timer  # Wall-clock rather than CPU time
+time_sample.timer   = default_timer  # Wall-clock rather than CPU time
+time_sample.timeout = 600            # Can be slow
