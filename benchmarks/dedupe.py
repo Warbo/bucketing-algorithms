@@ -10,4 +10,5 @@ with open(getenv('samples'), 'r') as f:
 def time_dedupe():
     run_on([cmd], samples)
 
-time_dedupe.timer = default_timer  # Wall-clock rather than CPU time
+time_dedupe.timer   = default_timer  # Wall-clock rather than CPU time
+time_dedupe.timeout = 600            # Can be slow
