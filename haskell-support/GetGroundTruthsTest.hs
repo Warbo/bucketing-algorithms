@@ -60,8 +60,8 @@ augmentNull = testProperty "Can handle null reps" go
         check post (_, x) = previous x === "llun" .&&.
                             next     x === post
 
-type Method     = String
-type BucketSize = String
+type Method      = String
+type BucketCount = String
 
 newtype ArrayArgs = AA
   ([Method], [(String, [[Int]])], [Helper.Name], String)
@@ -233,7 +233,7 @@ augmentArray = localOption (QuickCheckTests 10) $ testGroup "Rep handling" [
                             else error (show ("length ns", length ns, "n", n))
            in map (map select) content
 
-parseOut :: String -> Maybe (Map.Map Method (Map.Map BucketSize [[String]]))
+parseOut :: String -> Maybe (Map.Map Method (Map.Map BucketCount [[String]]))
 parseOut s = do
     pair <- parseOut' s
     let obj = snd pair
@@ -249,7 +249,7 @@ parseOut s = do
 
   where parseOut' :: String -> Maybe (A.Value,
                                       Map.Map Method
-                                              (Map.Map BucketSize
+                                              (Map.Map BucketCount
                                                        (Map.Map String
                                                                 [A.Value])))
         parseOut' = A.decode . LB.pack

@@ -36,7 +36,7 @@ rec {
                   Left err -> error err
                   Right ns -> ns
                 asts     = BucketUtil.astsOf AstsOf.astsOf' names
-                bucketed = BucketUtil.bucketSizes [1..20] asts ${mod}.bucketer
+                bucketed = BucketUtil.bucketCounts [1..20] asts ${mod}.bucketer
                 entries  = BucketUtil.entries bucketed
             LBS.putStr (A.encode (BucketUtil.toJSON' (head entries)))
         '';

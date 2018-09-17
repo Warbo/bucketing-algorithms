@@ -23,14 +23,14 @@ type SizeStats = MsgPackMap Method BucketsStats
 data Rep
 data RepData
 data BucketsStats
-type BucketSize = Int
+type BucketCount = Int
 type Proportion = Double
-type Buckets    = Map.Map BucketSize [Proportion]
+type Buckets    = Map.Map BucketCount [Proportion]
 type Method     = T.Text
 type Methods    = Map.Map Method Buckets
 
 -- | Iterate through reps, accumulating a map of average data for each method.
---   Write out the map of method->bucketSize->stats when done.
+--   Write out the map of method->bucketCount->stats when done.
 processSize :: Consumer (MsgPackMap Rep    RepData     )
                         (MsgPackMap Method BucketsStats)
 processSize = Consumer consumer
@@ -74,12 +74,12 @@ repMethods bs = case parseNext "repMethods" (getRepHeader "repMethods") bs of
                                bs'''
 
         fix :: (T.Text, Double) -> (Int, [Double])
-        fix (bSize, proportion) = (read (T.unpack bSize), [proportion])
+        fix (bCount, proportion) = (read (T.unpack bCount), [proportion])
 
 writeMethod :: (Method, Buckets) -> StdOut ()
 writeMethod (m, bkts) = do writeMP (MP.ObjectStr m)
                            writeMP (MP.ObjectMap (map fix (Map.toList bkts)))
-  where fix (bSize, props) = (MP.ObjectStr (T.pack (show bSize)),
+  where fix (bCount, props) = (MP.ObjectStr (T.pack (show bCount)),
                               MP.ObjectMap (stats props)        )
 
 methodsToObjects :: Methods -> Object
@@ -90,9 +90,9 @@ methodsToObjects = process wrapMethod
         wrapMethod (          method,                    buckets) =
                    (ObjectStr method, process wrapBucket buckets)
 
-        wrapBucket :: (BucketSize, [Proportion]) -> (Object, Object)
-        wrapBucket (                        bucketSize  ,             ps ) =
-                   (ObjectStr (showText bucketSize), ObjectMap (stats ps))
+        wrapBucket :: (BucketCount, [Proportion]) -> (Object, Object)
+        wrapBucket (                        bucketCount  ,             ps ) =
+                   (ObjectStr (showText bucketCount), ObjectMap (stats ps))
 
         showText = T.pack . show
 
@@ -135,8 +135,8 @@ stats props = [("proportion", ObjectMap [("mean"  , ObjectDouble mean  ),
 mergeReps :: Buckets -> Buckets -> Buckets
 mergeReps = Map.unionWith (++)
 
--- | Iterates through a rep of method->bucketSizeMap, plucking a result for each
---   of the method's bucket sizes.
+-- | Iterates through a rep of method->bucketCountMap, plucking a result for each
+--   of the method's bucket counts.
 repMap :: [(Object, Object)] -> Methods
 repMap = go Map.empty
   where go !acc []                                              = acc
@@ -146,13 +146,13 @@ repMap = go Map.empty
                          (acc                 :: Methods))
              methods
 
--- | Collects up the ground truth proportions from a map of bucketSize->results
+-- | Collects up the ground truth proportions from a map of bucketCount->results
 bucketMap :: [(Object, Object)] -> Buckets
 bucketMap = Map.fromList . map go
-  where go (ObjectStr      bucketSize , ObjectMap info ) =
-          (read (T.unpack bucketSize), [prop     info])
+  where go (ObjectStr      bucketCount , ObjectMap info ) =
+          (read (T.unpack bucketCount), [prop     info])
 
--- | Given the results for a particular bucket size, extracts the proportion of
+-- | Given the results for a particular bucket count, extracts the proportion of
 --   ground truth theorems which are possible to find.
 prop :: [(Object, Object)] -> Proportion
 prop l = case lookup "comparison" l of

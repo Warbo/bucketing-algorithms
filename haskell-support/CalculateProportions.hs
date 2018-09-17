@@ -26,7 +26,7 @@ import           MsgPack
 
 data Size
 data Rep
-data BucketSize
+data BucketCount
 data Sample = Sample { sNames :: [MP.Object], sTheorems :: [MP.Object] }
 data Method
 data RawBucket
@@ -36,12 +36,12 @@ data MsgPackNull
 type RepData          = Either MsgPackNull
 type RawRep           = (Sample, RawMethods      )
 type RepWithProps     = (Sample, MethodsWithProps)
-type RawSize          = MsgPackMap Rep        (RepData RawRep      )
-type SizeWithProps    = MsgPackMap Rep        (RepData RepWithProps)
-type RawMethods       = MsgPackMap Method     RawBuckets
-type MethodsWithProps = MsgPackMap Method     BucketsWithProps
-type RawBuckets       = MsgPackMap BucketSize RawBucket
-type BucketsWithProps = MsgPackMap BucketSize BucketWithProp
+type RawSize          = MsgPackMap Rep         (RepData RawRep      )
+type SizeWithProps    = MsgPackMap Rep         (RepData RepWithProps)
+type RawMethods       = MsgPackMap Method      RawBuckets
+type MethodsWithProps = MsgPackMap Method      BucketsWithProps
+type RawBuckets       = MsgPackMap BucketCount RawBucket
+type BucketsWithProps = MsgPackMap BucketCount BucketWithProp
 
 -- Helpers
 

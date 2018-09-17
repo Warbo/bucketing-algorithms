@@ -99,11 +99,11 @@ type Bucketer = (Method, Int -> [AST] -> [[HT.Identifier]])
 
 type Bucketed = Map.Map Method (Map.Map Int [[Name]])
 
-bucketSizes :: [Int] -> [AST] -> Bucketer -> Bucketed
-bucketSizes sizes asts (method, bucket) = force (Map.singleton method results)
-  where results = Map.fromList (map go sizes)
-        go size = let buckets = map (map (mkName . HT.idName)) (bucket size asts)
-                   in size `deepseq` buckets `deepseq` (size, buckets)
+bucketCounts :: [Int] -> [AST] -> Bucketer -> Bucketed
+bucketCounts counts asts (method, bucket) = force (Map.singleton method results)
+  where results = Map.fromList (map go counts)
+        go count = let buckets = map (map (mkName . HT.idName)) (bucket count asts)
+                   in count `deepseq` buckets `deepseq` (count, buckets)
 
 entries :: Bucketed -> [Map.Map Int [[Name]]]
 entries = map snd . Map.toList
@@ -120,8 +120,8 @@ instance NFData Rep where
 
 instance A.ToJSON Rep where
   toJSON (Rep sample bucketed) =
-    let meth (Method m, bucketed) = m A..= A.object (map size (Map.toList bucketed))
-        size (i, names)           = T.pack (show i) A..= map (map unName) names
+    let meth (Method m, bucketed) = m A..= A.object (map count (Map.toList bucketed))
+        count (i, names)           = T.pack (show i) A..= map (map unName) names
      in A.object (("sample" A..= sample):map meth (Map.toList bucketed))
 
 instance A.FromJSON Rep where
@@ -217,16 +217,16 @@ processRep' (astsOf, bucketers) size !key !bs =
                                                bktObj (addBuckets ns bkt)      ]
 
         bktObj = let meth (Method m, bktd) = m A..= A.object
-                                                      (map size
+                                                      (map count
                                                            (Map.toList bktd))
-                     size (i, ns) = T.pack (show i) A..= map (map unName) ns
+                     count (i, ns) = T.pack (show i) A..= map (map unName) ns
                   in A.object . map meth . Map.toList
 
         bs' = LBS.dropWhile notStart bs
 
         addBuckets smp bkt = Map.unions (bkt:map (bucket smp) bucketers)
 
-        bucket smp = bucketSizes [1..20] (astsOf smp)
+        bucket smp = bucketCounts [1..20] (astsOf smp)
 
         notStart '{' = False
         notStart 'n' = False

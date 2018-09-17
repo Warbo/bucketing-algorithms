@@ -16,7 +16,7 @@ Reads in JSON bucketing results, of the form:
         },
         {
           method1 : {
-            bucketSize1 : {
+            bucketCount1 : {
               "names" : [
                 [
                   name1,
@@ -39,11 +39,11 @@ Reads in JSON bucketing results, of the form:
     ...
   }
 
-For each rep of each size, the "sample" entry contains all of the sampled names
-and the full ground truth. Each sibling of "sample" contains the results of a
+For each rep of each size, the first array element contains all of the sampled
+names and the full ground truth. The second element contains the results of a
 bucketing method. Each bucketing method has entries for a variety of different
-(target, or average) bucket sizes; for example "1" will (attempt to) put each
-name in its own bucket, "5" will (attempt to) put five names in each bucket,
+(target, or average) bucket counts; for example "1" will (attempt to) put all
+names into one bucket, "5" will (attempt to) spread them across five buckets,
 etc. Note that we say 'target', 'average' and 'attempt', since each method may
 prefer to keep some names together even if other buckets are available.
 
