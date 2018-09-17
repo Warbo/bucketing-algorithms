@@ -3,35 +3,37 @@ Reads in JSON bucketing results, of the form:
 
   {
     size1 : {
-      rep1 : {
-        "sample" : {
-          "names" : [
+      rep1 : [
+        {
+          "sampleNames" : [
             name1,
             ...
           ],
-          "theorems" : [
+          "sampleTheorems" : [
             theorem1,
             ...
           ]
         },
-        method1 : {
-          bucketSize1 : {
-            "names" : [
-              [
-                name1,
+        {
+          method1 : {
+            bucketSize1 : {
+              "names" : [
+                [
+                  name1,
+                  ...
+                ],
                 ...
               ],
-              ...
-            ],
-            "theorems" : [
-              theorem1,
-              ...
-            ]
+              "theorems" : [
+                theorem1,
+                ...
+              ]
+            },
+            ...
           },
           ...
-        },
-        ...
-      },
+        }
+      ],
       ...
     },
     ...
@@ -42,16 +44,24 @@ and the full ground truth. Each sibling of "sample" contains the results of a
 bucketing method. Each bucketing method has entries for a variety of different
 (target, or average) bucket sizes; for example "1" will (attempt to) put each
 name in its own bucket, "5" will (attempt to) put five names in each bucket,
-etc. Note that we say 'target', 'average' and 'try to', since each method may
+etc. Note that we say 'target', 'average' and 'attempt', since each method may
 prefer to keep some names together even if other buckets are available.
 
-For each size the "names" entry shows how the names were divided into buckets
+For each size, the "names" entry shows how the names were divided into buckets
 (conceptually this is a set of sets of names; the order is irrelevant). The
 "theorems" entry shows the union of the ground truths of the buckets.
 
 The purpose of this script is to calculate how much these 'unions of ground
 truths of buckets' differ from the 'ground truth of the union of buckets' (i.e.
 the full ground truth, if no bucketing were used).
+
+The output of this script, when fed the above data, replaces each 'bucket size'
+value with the ratio described above. We throw out the names and theorems, since
+we may have a lot of data to deal with.
+
+Note that some reps may be 'null', which indicates that their sample was a
+duplicate of some other rep, and hence it's been discarded to prevent
+double-conting.
 */
 { fail, jq, msgpack-tools, nixpkgs1803, python3, runCommand, withDeps, wrap }:
 
@@ -67,9 +77,11 @@ with rec {
             h.bytestring h.data-msgpack h.text
           ]))
         ];
+        helper = ../haskell-support/MsgPack.hs;
         script = ../haskell-support/CalculateProportions.hs;
       }
       ''
+        cp "$helper" MsgPack.hs
         cp "$script" Main.hs
         ghc --make -O2 -o "$out" Main.hs
       '';
@@ -159,13 +171,10 @@ with rec {
       O=$(json "$oneThird" | go | tee "$out/onethird.json") ||
         fail "Failed when given valid input\n$O"
 
-      C=$(echo "$O" | jq '.["1"] | .["1"] | .[1] | .m | .["1"] | .comparison') ||
-        fail "Couldn't extract comparison data from:\n$O"
-      echo "$C" | jq -e '. == {"found"     :1,
-                               "available" :3,
-                               "missing"   :2,
-                               "proportion":0.3333333333333333}' ||
-        fail "Comparison data didn't match expected:\n$C\nTaken from:\n$O"
+      C=$(echo "$O" | jq '.["1"] | .["1"] | .[1] | .m | .["1"]') ||
+        fail "Couldn't extract proportion from:\n$O"
+      echo "$C" | jq -e '. == 0.3333333333333333' ||
+        fail "Proportion didn't match expected:\n$C\nTaken from:\n$O"
 
       true
     '';
