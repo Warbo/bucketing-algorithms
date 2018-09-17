@@ -13,10 +13,12 @@ with rec {
             h.bytestring h.containers h.data-msgpack h.text
           ]))
         ];
-        main = ../haskell-support/AverageProportions.hs;
+        helper = ../haskell-support/MsgPack.hs;
+        main   = ../haskell-support/AverageProportions.hs;
       }
       ''
-        cp "$main" Main.hs
+        cp "$helper" MsgPack.hs
+        cp "$main"   Main.hs
         ghc --make -O2 -o "$out" Main.hs
       '';
   };

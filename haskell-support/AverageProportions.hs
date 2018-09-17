@@ -7,24 +7,22 @@ import qualified Data.MessagePack     as MP
 import           Data.MessagePack     (Object(..))
 import           Data.String          (fromString, IsString)
 import qualified Data.Text            as T
-
-instance IsString Object where
-  fromString = ObjectStr . T.pack
-
-err :: Show a => a -> b
-err = error . show
+import           Debug.Trace          (trace)
+import           MsgPack
 
 dropDupes = filter notNil
   where notNil (k, ObjectNil) = False
         notNil (k, _        ) = True
 
-process :: Object -> Object
-process x = case x of
-    ObjectMap kvs -> ObjectMap (map go kvs)
-    _             -> err (("error", "'process' expected map"),
-                          ("given", x                       ))
-  where go (k, v) = (k, processSize v)
+process :: Consumer (MsgPackMap Size SizeProps) (MsgPackMap Size SizeStats)
+process = mapMap "process" (dumpKey "process" processSize)
 
+data Size
+type SizeProps = MsgPackMap Rep    RepData
+type SizeStats = MsgPackMap Method BucketsStats
+data Rep
+data RepData
+data BucketsStats
 type BucketSize = Int
 type Proportion = Double
 type Buckets    = Map.Map BucketSize [Proportion]
@@ -33,20 +31,56 @@ type Methods    = Map.Map Method Buckets
 
 -- | Iterate through reps, accumulating a map of average data for each method.
 --   Write out the map of method->bucketSize->stats when done.
-processSize :: Object -> Object
-processSize (ObjectMap rs) = methodsToObjects (gatherReps Map.empty rs)
+processSize :: Consumer (MsgPackMap Rep    RepData     )
+                        (MsgPackMap Method BucketsStats)
+processSize = Consumer consumer
+  where consumer bs = let (n, bs') = parseNext "processSize"
+                                               (getMapHeader "processSize")
+                                               bs
+                       in go Map.empty bs' n
+        go !acc !bs !n = case n of
+          0 -> writeMapHeader (Map.size acc)      >>
+               mapM_ writeMethod (Map.toList acc) >>
+               pure bs
 
--- | Iterates through reps of method->bucketSizeMap, discarding nulls and
---   accumulating a method->bucketSize->[proportion] of the rest
-gatherReps :: Methods -> [(Object, Object)] -> Methods
-gatherReps !acc kvs = case kvs of
-                        []            -> acc
-                        (_, rep):kvs' -> gatherReps (withRep rep) kvs'
-  where withRep x = case x of
-          ObjectNil                            -> acc
-          (ObjectArray [_, ObjectMap methods]) -> Map.unionWith mergeReps
-                                                                acc
-                                                                (repMap methods)
+          _ -> let (_, bs') = parseNext "processSize (rep index)"
+                                        MP.getObject
+                                        bs
+                   (methods, bs'') = repMethods bs'
+                in go (Map.unionWith mergeReps acc (methods :: Methods))
+                      bs''
+                      (n-1)
+
+repMethods bs = case parseNext "repMethods" (getRepHeader "repMethods") bs of
+                  (RepTypeNull, bs') -> (Map.empty, bs')
+                  (RepTypeData, bs') -> let (_, bs'' ) = skipSample bs'
+                                            (n, bs''') = mapLength  bs''
+                                         in go Map.empty n bs'''
+  where skipSample = parseNext "repMethods (skip sample)" MP.getObject
+        mapLength  = parseNext "repMethods (map length)"
+                               (getMapHeader "repMethods (map length)")
+
+        getBucket = MP.getMap MP.getStr MP.getDouble
+
+        go !acc 0 bs' = (acc, bs')
+        go !acc n bs' = let (m  , bs'' ) = parseNext "method name"
+                                                     MP.getStr
+                                                     bs'
+                            (bkt, bs''') = parseNext "buckets"
+                                                     getBucket
+                                                     bs''
+                         in go (Map.insert m (Map.fromList (map fix bkt)) acc)
+                               (n-1)
+                               bs'''
+
+        fix :: (T.Text, Double) -> (Int, [Double])
+        fix (bSize, proportion) = (read (T.unpack bSize), [proportion])
+
+writeMethod :: (Method, Buckets) -> StdOut ()
+writeMethod (m, bkts) = do writeMP (MP.ObjectStr m)
+                           writeMP (MP.ObjectMap (map fix (Map.toList bkts)))
+  where fix (bSize, props) = (MP.ObjectStr (T.pack (show bSize)),
+                              MP.ObjectMap (stats props)        )
 
 methodsToObjects :: Methods -> Object
 methodsToObjects = process wrapMethod
@@ -116,7 +150,7 @@ repMap = go Map.empty
 bucketMap :: [(Object, Object)] -> Buckets
 bucketMap = Map.fromList . map go
   where go (ObjectStr      bucketSize , ObjectMap info ) =
-           (read (T.unpack bucketSize), [prop     info])
+          (read (T.unpack bucketSize), [prop     info])
 
 -- | Given the results for a particular bucket size, extracts the proportion of
 --   ground truth theorems which are possible to find.
@@ -138,7 +172,4 @@ prop l = case lookup "comparison" l of
                            ("key"       , "comparison"),
                            ("entries"   , l           ))
 
-main :: IO ()
-main = BS.interact (MP.pack . process . unwrap . MP.unpack)
-  where unwrap Nothing  = error "Couldn't decode MsgPack from stdin"
-        unwrap (Just x) = x
+main = msgPackMain process
