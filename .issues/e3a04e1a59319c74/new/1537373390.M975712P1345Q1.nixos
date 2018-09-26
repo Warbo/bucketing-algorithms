@@ -1,0 +1,15 @@
+From: Chris Warburton
+Date: Wed, 19 Sep 2018 17:06:05 +0100
+State: new
+Subject: Calculate optimal buckets
+Message-Id: <e3a04e1a59319c74-0-artemis@nixos>
+
+Comparing against random bucketing is all well and good, but it would be
+nice to see how good bucketing *could* be.
+
+This is quite tricky to pin down, since we could just throw everything
+into one bucket and get 100%. Hence it makes more sense to calculate the
+optimal for a given *maximum bucket size*.
+
+This probably requires a lot of search, so it might be best calculated
+in a logic language like Mercury.
