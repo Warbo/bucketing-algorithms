@@ -14,21 +14,22 @@ with {
       bucketRemainderS = toString bucketRemainder;
       bucketSizeS      = toString bucketSize;
 
-      set = "1.." + nameCountS;
+      type   = "set of 1.." + nameCountS;
+      bucket = n: "bucket" + toString n;
     };
     writeScript "bounds.mzn" ''
       include "globals.mzn";
 
       % Declare bucketCount buckets, as sets of elements from 1 to nameCount
       ${concatStringsSep "\n"
-          (map (n: "var set of ${set}: bucket${toString n};")
+          (map (n: "var ${type}: ${bucket n};")
                (range 1 bucketCount))}
 
       % Force bucket sizes: bucket1 will be the remainder (which may be zero),
       % all others are of size bucketSize
       constraint card(bucket1) = ${bucketRemainderS};
       ${concatStringsSep "\n"
-          (map (n: "constraint card(bucket${toString n}) = ${bucketSizeS};")
+          (map (n: "constraint card(${bucket n}) = ${bucketSizeS};")
                (range 2 bucketCount))}
 
       % Buckets should not overlap
@@ -46,15 +47,18 @@ with {
                (range 1 bucketCount))}
 
       % TODO: Fix score
-      function var int: score(var set of ${set}: bucket) = min(bucket);
+      function var int: score(var ${type}: bucket) = min(bucket);
 
       solve maximize ${concatStringsSep " + "
-                         (map (n: "score( bucket${toString n} )")
+                         (map (n: "score( ${bucket n} )")
                               (range 1 bucketCount))};
 
-      output [ ${concatStringsSep " ++ "
-                   (map (n: ''"[" ++ show( bucket${toString n} ) ++ "]"'')
-                        (range 1 bucketCount))} ];
+      array[1..${nameCountS}] of string: names;
+      names = [ ${concatStringsSep ", " (map (n: ''"${n}"'') names)} ];
+
+      output [${concatStringsSep '', "\n", ''
+                  (map (n: ''show([ names[i] | i in ${bucket n} ])'')
+                       (range 1 bucketCount))}];
     '';
 };
 /*{ samples }:*/ runCommand "bucket-bounds"
