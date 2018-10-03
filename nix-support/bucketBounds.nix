@@ -16,6 +16,21 @@ with {
 
       type   = "set of 1.." + nameCountS;
       bucket = n: "bucket" + toString n;
+
+      # Since we models the names as numbers 1..nameCount, we convert the deps
+      # of each theorem into their corresponding numbers too.
+      deps =
+        with {
+          indices = listToAttrs (imap1 (value: name: {
+                                         inherit name value;
+                                       })
+                                       names);
+        };
+        imap1 (i: ds: {
+                id   = "theorem" + toString i;
+                deps = map (n: getAttr n indices) ds;
+              })
+              (attrValues theorems);
     };
     writeScript "bounds.mzn" ''
       include "globals.mzn";
@@ -47,7 +62,24 @@ with {
                (range 1 bucketCount))}
 
       % TODO: Fix score
-      function var int: score(var ${type}: bucket) = min(bucket);
+      ${concatStringsSep "\n"
+          (map (theorem: concatStrings [
+                 "function var int: "
+                 theorem.id "(var ${type}: bucket) = "
+                 "if (" (concatStringsSep " /\\ "
+                           (map (d: "(${toString d} in bucket)")
+                                theorem.deps)) ") "
+                   "then 1 "
+                   "else 0 "
+                 "endif;"
+               ])
+               deps)}
+
+      function var int: score(var ${type}: bucket) = ${
+        concatStringsSep " + "
+          (map (theorem: "(" + theorem.id + "(bucket))")
+               deps)
+      };
 
       solve maximize ${concatStringsSep " + "
                          (map (n: "score( ${bucket n} )")
