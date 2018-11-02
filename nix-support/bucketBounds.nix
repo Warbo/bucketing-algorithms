@@ -1,9 +1,10 @@
-{ lib, minizinc, nixpkgs1703, runCommand, writeScript }:
+{ attrsToDirs', ghcWithML4HSFE, lib, nixpkgs1703, nixpkgs1803, runCommand,
+  writeScript }:
 
 with builtins;
 with lib;
-with {
-  renderModel = { bucketSize, names, theorems }:
+with rec {
+  renderModel = { bound, bucketSize, names, theorems }:
     with rec {
         nameCount      = length names;
       bucketCount      = (nameCount / bucketSize) + 1;
@@ -61,7 +62,6 @@ with {
                           (range 1 bucketCount)))
                (range 1 bucketCount))}
 
-      % TODO: Fix score
       ${concatStringsSep "\n"
           (map (theorem: concatStrings [
                  "function var int: "
@@ -81,9 +81,9 @@ with {
                deps)
       };
 
-      solve maximize ${concatStringsSep " + "
-                         (map (n: "score( ${bucket n} )")
-                              (range 1 bucketCount))};
+      solve ${bound}imize ${concatStringsSep " + "
+                              (map (n: "score( ${bucket n} )")
+                                   (range 1 bucketCount))};
 
       array[1..${nameCountS}] of string: names;
       names = [ ${concatStringsSep ", " (map (n: ''"${n}"'') names)} ];
@@ -92,24 +92,57 @@ with {
                   (map (n: ''show([ names[i] | i in ${bucket n} ])'')
                        (range 1 bucketCount))}];
     '';
-};
-/*{ samples }:*/ runCommand "bucket-bounds"
-  {
-    buildInputs = [ nixpkgs1703.gecode minizinc ];
-    model       = renderModel {
-      bucketSize = 5;
-      names      = [ "a" "b" "c" "d" "e" "f" "g" "h" "i" "j" "k" ];
-      theorems   = {
-        t1 = [ "a" "b" "i" ];
-        t2 = [ "a" "g"     ];
-        t3 = [ "d" "j" "k" ];
+
+  sampleBounds = sample:
+    with {
+      args = {
+        bucketSize = 5;
+        names      = [ "a" "b" "c" "d" "e" "f" "g" "h" "i" "j" "k" ];
+        theorems   = {
+          t1 = [ "a" "b" "i" ];
+          t2 = [ "a" "g"     ];
+          t3 = [ "d" "j" "k" ];
+        };
       };
     };
-  }
-  ''
-    echo "Solving $model" 1>&2
-    #cp "$model" model.mzn
-    #mzn2fzn model.mzn
-    #cat model.fzn
-    mzn-fzn -f fzn-gecode "$model" > "$out"
-  ''
+    runCommand "bucket-bounds"
+      {
+        buildInputs = [ nixpkgs1703.gecode nixpkgs1803.minizinc ];
+        model       = renderModel ;
+      }
+      ''
+        echo "Solving $model" 1>&2
+        mzn-fzn -f fzn-gecode "$model" > "$out"
+      '';
+
+  bucketBoundBuilder = { cmds ? [], deps ? {}, main }:
+    runCommand "bucket-bound-runner-${main}"
+      (deps // {
+        buildInputs = [ (ghcWithML4HSFE {}) ];
+        src         = attrsToDirs' "bucket-bound-src" {
+          "BucketBounds.hs" = ../haskell-support/BucketBounds.hs;
+          "BucketUtil.hs"   =  ../haskell-support/BucketUtil.hs;
+          "Main.hs"         = writeScript "bb-main.hs" ''
+            module Main where
+            import qualified BucketBounds
+            main = BucketBounds.${main}
+          '';
+        };
+      })
+      ''
+        ${concatStringsSep "\n" cmds}
+        cp -v "$src"/* ./
+        ghc --make -O2 -o "$out" Main
+      '';
+
+  bucketBoundRunner = bucketBoundBuilder {
+    cmds = [ "$tests" ];
+    deps = {
+      tests = bucketBoundBuilder {
+        main = "boundsTest";
+      };
+    };
+    main = "boundsMain";
+  };
+};
+bucketBoundRunner

@@ -47,7 +47,7 @@ with rec {
   initial = {
     inherit (self.nix-helpers)
       # Pristine releases of nixpkgs. Useful for avoiding known problems
-      nixpkgs1603 nixpkgs1609 nixpkgs1709 nixpkgs1803
+      nixpkgs1603 nixpkgs1609 nixpkgs1703 nixpkgs1709 nixpkgs1803
 
       # Helper functions, etc.
       attrsToDirs' allDrvsIn backtrace composeWithArgs die fail inNixedDir
@@ -131,6 +131,7 @@ fold appendDef
     "averageProportions"
     "benchmark"
     "benchmarkingCommands"
+    "bucketBounds"
     "bucketCheck"
     "bucketProportions"
     "bucketRunner"
