@@ -27,8 +27,8 @@ findColon = testProperty "Can find colons" go
   where go :: String -> Int -> Property
         go post n = forAll (genSpace n) (canFind post)
 
-        canFind post pre = found pre post (runOn GGT.findColon
-                                                 (mkStart pre post))
+        canFind post pre = found pre post (BU.runOn GGT.findColon
+                                                    (mkStart pre post))
 
         mkStart pre post = pre ++ ":" ++ post
 
@@ -55,7 +55,7 @@ subset = testGroup "Can find subsets" [
           property (not (xs `Helper.subset` (Helper.mkAscendingList ys)))
 
 augmentNull = testProperty "Can handle null reps" go
-  where go post = check post (runOn GGT.augmentRep ("null" ++ post))
+  where go post = check post (BU.runOn GGT.augmentRep ("null" ++ post))
 
         check post (_, x) = previous x === "llun" .&&.
                             next     x === post
@@ -177,7 +177,7 @@ augmentArray = localOption (QuickCheckTests 10) $ testGroup "Rep handling" [
     , testProperty "Check buckets"       (go checkBuckets)
     ]
 
-  where go f (AA args) = let result = runOn GGT.augmentRep (render args)
+  where go f (AA args) = let result = Bu.runOn GGT.augmentRep (render args)
                              -- Show final state if there's a failure
                           in counterexample (show ("result", result))
                                             (f args result)
@@ -256,8 +256,6 @@ parseOut s = do
 
         jsonToString (A.String s) = T.unpack s
 
-runOn f s = runState (f testImp) (startState s)
-
 genSpace :: Int -> Gen String
 genSpace 0          = pure ""
 genSpace n | n < 0  = genSpace (abs n)
@@ -279,48 +277,3 @@ instance Arbitrary Helper.Name where
 
 depNames = nub (concatMap get GGT.theoremDeps)
   where get (_, Helper.AscendingList deps) = deps
-
-data TestImp = TestImp {
-    previous :: String
-  , next     :: String
-  , out      :: String
-  , err      :: [String]
-  } deriving (Show)
-
-startState s = TestImp {
-    previous = ""
-  , next     = s
-  , out      = ""
-  , err      = []
-  }
-
-testImp :: BU.StreamImp (State TestImp)
-testImp = BU.StreamImp {
-      BU.getchar     = getchar
-    , BU.getcontents = getcontents
-    , BU.info        = info
-    , BU.putchar     = putchar
-    , BU.putstr      = putstr
-    }
-  where getchar = do x <- get
-                     let pre      = previous x
-                     case next x of
-                       ""     -> error "Exhausted input"
-                       c:rest -> do put (x { previous = c:pre, next = rest })
-                                    pure c
-
-        getcontents = do x <- get
-                         let pre  = previous x
-                             rest = next     x
-                         put (x { previous = reverse rest ++ pre, next = "" })
-                         pure (LB.pack rest)
-
-        info :: String -> State TestImp ()
-        info s = do x <- get
-                    put (x { err = s : err x })
-
-        putchar :: Char -> State TestImp ()
-        putchar c = do x <- get
-                       put (x { out = c : out x })
-
-        putstr = mapM_ putchar . LB.unpack

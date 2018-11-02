@@ -9,6 +9,7 @@ module BucketUtil where
 import           Control.Applicative        ((<|>))
 import           Control.DeepSeq            (($!!), deepseq, force, NFData, rnf)
 import           Control.Monad              (mzero, replicateM)
+import           Control.Monad.State.Strict (get, put, replicateM_, runState, State)
 import qualified Data.Aeson                 as A
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import qualified Data.Char                  as C
@@ -354,3 +355,52 @@ parseOne' imp = getchar imp >>= go LBS.empty PSTop
           (_, '{') -> readSnoc bs '{' (PSInside CObject s)
           (_, '[') -> readSnoc bs '[' (PSInside CArray  s)
           (_, '"') -> readSnoc bs '"' (PSInside CString s)
+
+-- Testing support
+
+data TestImp = TestImp {
+    previous :: String
+  , next     :: String
+  , out      :: String
+  , err      :: [String]
+  } deriving (Show)
+
+startState s = TestImp {
+    previous = ""
+  , next     = s
+  , out      = ""
+  , err      = []
+  }
+
+testImp :: StreamImp (State TestImp)
+testImp = StreamImp {
+      getchar     = getchar
+    , getcontents = getcontents
+    , info        = info
+    , putchar     = putchar
+    , putstr      = putstr
+    }
+  where getchar = do x <- get
+                     let pre      = previous x
+                     case next x of
+                       ""     -> error "Exhausted input"
+                       c:rest -> do put (x { previous = c:pre, next = rest })
+                                    pure c
+
+        getcontents = do x <- get
+                         let pre  = previous x
+                             rest = next     x
+                         put (x { previous = reverse rest ++ pre, next = "" })
+                         pure (LBS.pack rest)
+
+        info :: String -> State TestImp ()
+        info s = do x <- get
+                    put (x { err = s : err x })
+
+        putchar :: Char -> State TestImp ()
+        putchar c = do x <- get
+                       put (x { out = c : out x })
+
+        putstr = mapM_ putchar . LBS.unpack
+
+runOn f s = runState (f testImp) (startState s)
