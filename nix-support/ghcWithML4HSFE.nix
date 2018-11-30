@@ -27,12 +27,15 @@ with rec {
   # each other. If these packages' dependencies break other stuff, we don't need
   # to care since we're not using these for anything else.
   hsPkgs = { profile ? false }:
+    with { inherit (nixpkgs1803.lib) composeExtensions; };
     nixpkgs1803.haskell.packages.ghc7103.override (old: {
-      overrides = nixpkgs1803.lib.composeExtensions
+      overrides = composeExtensions
         (old.overrides or (_: _: {}))
         (self: super: (if profile then profiler super else {}) // {
           # Tests can fail due to missing Arbitrary instances
-          aeson = haskell.lib.dontCheck super.aeson;
+          aeson      = haskell.lib.dontCheck super.aeson;
+          lens       = haskell.lib.dontCheck super.lens;
+          lens-aeson = haskell.lib.dontCheck super.lens-aeson;
 
           # Dependency of ML4HSFE. Note that this needs GHC 7.10, due to changes
           # in GHC's package DB implementation.
