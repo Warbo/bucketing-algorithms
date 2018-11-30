@@ -118,7 +118,9 @@ with rec {
   bucketBoundBuilder = { cmds ? [], deps ? {}, main }:
     runCommand "bucket-bound-runner-${main}"
       (deps // {
-        buildInputs = [ (ghcWithML4HSFE {}) ];
+        buildInputs = [
+          (ghcWithML4HSFE { extraPkgs = [ "lens-aeson" ]; })
+        ];
         src         = attrsToDirs' "bucket-bound-src" {
           "BucketBounds.hs" = ../haskell-support/BucketBounds.hs;
           "BucketUtil.hs"   =  ../haskell-support/BucketUtil.hs;
