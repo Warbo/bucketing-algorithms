@@ -69,24 +69,26 @@ with rec {
     });
 
   # These are the packages we want to ensure are working
-  env = args: (hsPkgs args).ghcWithPackages (hs: [
-    hs.aeson
-    hs.bytestring
-    hs.containers
-    hs.cryptonite
-    hs.intern
-    hs.memory
-    hs.ML4HSFE
-    hs.process
-    hs.process-extras
-    hs.QuickCheck
-    hs.tasty
-    hs.tasty-quickcheck
-    hs.text
-    hs.th-lift-instances
-    hs.unordered-containers
-    hs.vector
-  ]);
+  env = { extraPkgs ? [], profile ? false }:
+    (hsPkgs { inherit profile; }).ghcWithPackages
+      (hs: map (n: getAttr n hs) (extraPkgs ++ [
+        "aeson"
+        "bytestring"
+        "containers"
+        "cryptonite"
+        "intern"
+        "memory"
+        "ML4HSFE"
+        "process"
+        "process-extras"
+        "QuickCheck"
+        "tasty"
+        "tasty-quickcheck"
+        "text"
+        "th-lift-instances"
+        "unordered-containers"
+        "vector"
+      ]));
 };
 rec {
   def   = env;
