@@ -14,7 +14,7 @@ import           Control.Monad.State.Strict (get, put, replicateM_, runState, St
 import qualified Data.Aeson                 as A
 import qualified Data.ByteString.Lazy.Char8 as BS
 import qualified Data.Char                  as C
-import           Data.List                  (intercalate, sort)
+import           Data.List                  ((\\), intercalate, nub, sort)
 import qualified Data.Map.Strict            as Map
 import qualified Data.Maybe                 as M
 import qualified Data.Text                  as T
@@ -26,7 +26,7 @@ import           Data.Maybe                 (fromMaybe)
 import           System.Environment         (lookupEnv)
 import           System.IO                  (openFile, IOMode(ReadMode))
 -}
-import           Test.QuickCheck
+import           Test.QuickCheck            hiding (sample)
 import           Test.Tasty                 (defaultMain, localOption, testGroup)
 import           Test.Tasty.QuickCheck      (testProperty)
 
@@ -114,24 +114,22 @@ decodeSample = Lens.prism encode decode
                             else Left  raw
         encode     = V.map A.String
 
-_sample :: AsValue a => Traversal' a Sample
-_sample = key "sample" . _Array . decodeSample
+sample :: AsValue a => Traversal' a Sample
+sample = key "sample" . _Array . decodeSample
+
+repSamples = members . sample
 
 {-
-_reps :: Traversal' _ A.Value
-_reps = traverse
-
-_repSamples = _reps . _sample
-
 _sizes :: Traversal' _ A.Value
 _sizes = traverse
 
-_sizeSamples = _sizes . _repSamples
+_sizeSamples = _sizes . repSamples
 -}
 
 boundsMain = error "NOT IMPLEMENTED"
 
 boundsTest = defaultMain $ testGroup "All tests" [
+    prop_collate,
     prop_getSample,
     prop_getReps
     --prop_getSizes
@@ -146,14 +144,15 @@ prop_getSample = testProperty "Can look up 'sample' from object" go
                        in "{\"sample\":" ++ list ++ "}"
 
         sampledNames :: String -> Maybe Sample
-        sampledNames = (^? _sample)
+        sampledNames = (^? sample)
 
         canGetSample :: Sample -> String -> Property
         canGetSample names str = let got  = sampledNames str
                                      want = Just names
                                   in got === want
 
-prop_getReps = testProperty "Can look up samples from object of reps" go
+prop_getReps = testProperty "Can look up samples from object of reps"
+                            (forAll genSampleList go)
   where go :: [Sample] -> Property
         go namess = canGetSamples namess (mkReps 1 [] namess)
 
@@ -167,13 +166,17 @@ prop_getReps = testProperty "Can look up samples from object of reps" go
 
         canGetSamples :: [Sample] -> String -> Property
         canGetSamples nss json = let got :: [Sample]
-                                     got = json ^.. members . _sample
+                                     got = json ^.. repSamples
 
                                      result = sort got === sort nss
                                   in counterexample (show ("json", json)) result
+{-
+prop_getSizes = testProperty "Can look up samples from objects of sizes" go
+  where go :: [Sample] -> Property
+        go samples = canGetSamples samples (mkSizes [] (collate samples))
 
---prop_getSizes = _sample "{\"1\":{\"2\":{\"sample\":[\"foo\"]}}" == [["foo"]]
-
+        mkSizes =
+-}
 {-
 prop_getSample = testProperty "Can get samples" go
   where go :: Int -> Sample -> Bool
@@ -182,7 +185,7 @@ prop_getSample = testProperty "Can get samples" go
                          in check reps' names' (render reps' names' [])
 
         check :: Int -> Sample -> String -> Bool
-        check reps names str = str & _sample
+        check reps names str = str & sample
 
         render reps []       acc = toJSON (Map.fromList acc)
         render reps (ns:nss) acc = render reps nss (mkReps ns reps []:acc)
@@ -210,3 +213,48 @@ renderSample :: Sample -> String
 renderSample s = renderArray (map show (V.toList s))
 
 renderSampleObject s = "{\"sample\": " ++ renderSample s ++ "}"
+
+collate :: [Sample] -> [[Sample]]
+collate = go []
+  where go acc []               = acc
+        go acc (sample:samples) = go (insert sample acc) samples
+
+        insert sample []            = [[sample]]
+        insert sample ((x:xs):rest) = if length sample == length x
+                                         then (sample:x:xs) : rest
+                                         else (       x:xs) : insert sample rest
+
+prop_collate = testProperty "Can collate samples by size" (forAll genSampleList go)
+  where go :: [Sample] -> Property
+        go samples = let collated = collate samples
+                      in sameSizes        collated .&&.
+                         lengthsDiffer    collated .&&.
+                         allFound samples collated
+
+        sameSizes []       = property True
+        sameSizes (xs:xss) = counterexample (show ("Lengths should match", xs))
+                                            (property (allSameLength xs)) .&&.
+                             sameSizes xss
+
+        allSameLength = (== 1) . length . nub . map length
+
+        lengthsDiffer :: [[Sample]] -> Property
+        lengthsDiffer = allDistinct . map (head . map length)
+
+        allFound samples collated = sort samples === sort (concat collated)
+
+allDistinct :: (Show a, Eq a) => [a] -> Property
+allDistinct xs = let distinct = nub xs
+                     dupes    = xs \\ distinct
+                  in counterexample (show (("error", "Found dupes"),
+                                           ("input", xs           ),
+                                           ("dupes", dupes        )))
+                                    (length dupes === 0)
+
+-- Using 'arbitrary :: [Sample]' can take ages; this makes smaller values
+genSampleList :: Gen [Sample]
+genSampleList = do n <- choose (0, 20)
+                   vectorOf n genSample
+  where genSample :: Gen Sample
+        genSample = do n <- choose (0, 20)
+                       V.fromList <$> vectorOf n arbitrary
