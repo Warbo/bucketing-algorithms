@@ -3,7 +3,7 @@ module BucketBounds where
 
 import qualified Control.Lens      as Lens
 import           Control.Lens.Operators
-import           Control.Lens.Type (IndexedTraversal', Lens')
+import           Control.Lens.Type (IndexedTraversal', Lens', Prism', Traversal')
 import           Data.Aeson        (toJSON)
 import           Data.Aeson.Lens
 
@@ -14,8 +14,9 @@ import           Control.Monad.State.Strict (get, put, replicateM_, runState, St
 import qualified Data.Aeson                 as A
 import qualified Data.ByteString.Lazy.Char8 as BS
 import qualified Data.Char                  as C
-import           Data.List                  (intercalate)
+import           Data.List                  (intercalate, sort)
 import qualified Data.Map.Strict            as Map
+import qualified Data.Maybe                 as M
 import qualified Data.Text                  as T
 import qualified Data.Vector                as V
 import qualified Data.Vector.Lens           as V
@@ -102,40 +103,74 @@ genFromSizes = pure . A.toJSON . map go
 
 --"{\"a\": 4, \"b\": 7}" & members . _Number *~ 10
 
-decodeSample :: Lens.Lens' RawSample Sample
-decodeSample = Lens.lens decode encode
-  where decode   = V.map (^. _String)
-        encode _ = V.map A.String
+-- s = Raw, a = Sample
+-- (a -> s) -> (s -> Either s a) -> Prism' s a
+decodeSample :: Prism' RawSample Sample
+decodeSample = Lens.prism encode decode
+  where decode raw = let l  = V.toList raw
+                         l' = M.catMaybes (map (^? _String) l)
+                      in if length l == length l'
+                            then Right (V.fromList l')
+                            else Left  raw
+        encode     = V.map A.String
 
-_sampleKey :: _ --Lens.Lens' String Sample
-_sampleKey = key "sample" . _Array . decodeSample
+_sample :: AsValue a => Traversal' a Sample
+_sample = key "sample" . _Array . decodeSample
 
---inputByteString & key "x1" . key "x2" . _Array %~ sum
+{-
+_reps :: Traversal' _ A.Value
+_reps = traverse
+
+_repSamples = _reps . _sample
+
+_sizes :: Traversal' _ A.Value
+_sizes = traverse
+
+_sizeSamples = _sizes . _repSamples
+-}
 
 boundsMain = error "NOT IMPLEMENTED"
 
 boundsTest = defaultMain $ testGroup "All tests" [
-    prop_getSampleKey
+    prop_getSample,
+    prop_getReps
     --prop_getSizes
     --prop_getSample
   ]
 
-prop_getSampleKey = testProperty "Can look up 'sample' from object" go
+prop_getSample = testProperty "Can look up 'sample' from object" go
   where go names = canGetSample names (mkObj names)
 
         mkObj :: Sample -> String
-        mkObj names = let rendered = map show (V.toList names)
-                          list     = "[" ++ intercalate ", " rendered ++ "]"
+        mkObj names = let list = renderSample names
                        in "{\"sample\":" ++ list ++ "}"
 
         sampledNames :: String -> Maybe Sample
-        sampledNames = (^? _sampleKey)
+        sampledNames = (^? _sample)
 
         canGetSample :: Sample -> String -> Property
         canGetSample names str = let got  = sampledNames str
                                      want = Just names
                                   in got === want
 
+prop_getReps = testProperty "Can look up samples from object of reps" go
+  where go :: [Sample] -> Property
+        go namess = canGetSamples namess (mkReps 1 [] namess)
+
+        mkReps :: Int -> [String] -> [Sample] -> String
+        mkReps n acc []       = "{" ++ intercalate "," acc ++ "}"
+        mkReps n acc (ns:nss) = let sample = renderSampleObject ns
+                                    key    = show (show n)  -- Needs quotes
+                                 in mkReps (n + 1)
+                                           ((key ++ ":" ++ sample) : acc)
+                                           nss
+
+        canGetSamples :: [Sample] -> String -> Property
+        canGetSamples nss json = let got :: [Sample]
+                                     got = json ^.. members . _sample
+
+                                     result = sort got === sort nss
+                                  in counterexample (show ("json", json)) result
 
 --prop_getSizes = _sample "{\"1\":{\"2\":{\"sample\":[\"foo\"]}}" == [["foo"]]
 
@@ -159,6 +194,8 @@ rotate []     = []
 rotate (x:xs) = xs ++ [x]
 -}
 
+-- Test helpers
+
 instance Arbitrary T.Text where
   arbitrary = T.pack . filter ok <$> arbitrary
     where ok c = C.isAlphaNum c && C.isAscii c
@@ -166,3 +203,10 @@ instance Arbitrary T.Text where
 instance Arbitrary a => Arbitrary (V.Vector a) where
   arbitrary = V.fromList <$> listOf arbitrary
   shrink    = map V.fromList . shrink . V.toList
+
+renderArray xs = "[" ++ intercalate ", " xs ++ "]"
+
+renderSample :: Sample -> String
+renderSample s = renderArray (map show (V.toList s))
+
+renderSampleObject s = "{\"sample\": " ++ renderSample s ++ "}"
