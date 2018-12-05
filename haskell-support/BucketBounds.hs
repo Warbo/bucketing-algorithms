@@ -117,7 +117,11 @@ decodeSample = Lens.prism encode decode
 sample :: AsValue a => Traversal' a Sample
 sample = key "sample" . _Array . decodeSample
 
+repSamples :: AsValue a => Traversal' a Sample
 repSamples = members . sample
+
+sizeSamples :: AsValue a => Traversal' a Sample
+sizeSamples = members . repSamples
 
 {-
 _sizes :: Traversal' _ A.Value
@@ -131,9 +135,8 @@ boundsMain = error "NOT IMPLEMENTED"
 boundsTest = defaultMain $ testGroup "All tests" [
     prop_collate,
     prop_getSample,
-    prop_getReps
-    --prop_getSizes
-    --prop_getSample
+    prop_getReps,
+    prop_getSizes
   ]
 
 prop_getSample = testProperty "Can look up 'sample' from object" go
@@ -152,7 +155,7 @@ prop_getSample = testProperty "Can look up 'sample' from object" go
                                   in got === want
 
 prop_getReps = testProperty "Can look up samples from object of reps"
-                            (forAll genSampleList go)
+                            (forAllSamples go)
   where go :: [Sample] -> Property
         go namess = canGetSamples namess (mkReps 1 [] namess)
 
@@ -170,13 +173,40 @@ prop_getReps = testProperty "Can look up samples from object of reps"
 
                                      result = sort got === sort nss
                                   in counterexample (show ("json", json)) result
-{-
-prop_getSizes = testProperty "Can look up samples from objects of sizes" go
+
+prop_getSizes = testProperty "Can look up samples from objects of sizes"
+                             (forAllSamples go)
   where go :: [Sample] -> Property
         go samples = canGetSamples samples (mkSizes [] (collate samples))
 
-        mkSizes =
--}
+        mkSizes :: [(String, String)] -> [[Sample]] -> String
+        mkSizes acc []                 = renderObject acc
+        mkSizes acc ([]:sizes)         = error "Empty size; shouldn't happen!"
+        mkSizes acc ((rep:reps):sizes) = let key = show (show (length rep))
+                                             val = mkReps 0 [] (rep:reps)
+                                          in mkSizes ((key, val):acc) sizes
+
+        mkReps :: Int -> [(String, String)] -> [Sample] -> String
+        mkReps n acc []         = renderObject acc
+        mkReps n acc (rep:reps) = let key = show (show n)
+                                      val = renderSampleObject rep
+                                   in mkReps (n + 1) ((key,val):acc) reps
+
+        canGetSamples :: [Sample] -> String -> Property
+        canGetSamples samples str = let got = str ^.. sizeSamples
+                                     in sort samples === sort got
+
+-- Takes a list of (key, value) string pairs and combines them into an object,
+-- e.g. 'renderObject [("\"x\"\", "42"), ("\"y\"\", "[]"]' gives {"x":42,"y":[]}
+renderObject xs = "{" ++ intercalate "," (map join xs) ++ "}"
+  where join (x, y) = if check x
+                         then x ++ ":" ++ y
+                         else error (show (("error", "Key isn't JSON string"),
+                                           ("key"  , x),
+                                           ("val"  , y)))
+        check "" = False
+        check x  = head x == '"' && last x == '"'
+
 {-
 prop_getSample = testProperty "Can get samples" go
   where go :: Int -> Sample -> Bool
@@ -224,7 +254,7 @@ collate = go []
                                          then (sample:x:xs) : rest
                                          else (       x:xs) : insert sample rest
 
-prop_collate = testProperty "Can collate samples by size" (forAll genSampleList go)
+prop_collate = testProperty "Can collate samples by size" (forAllSamples go)
   where go :: [Sample] -> Property
         go samples = let collated = collate samples
                       in sameSizes        collated .&&.
@@ -258,3 +288,5 @@ genSampleList = do n <- choose (0, 20)
   where genSample :: Gen Sample
         genSample = do n <- choose (0, 20)
                        V.fromList <$> vectorOf n arbitrary
+
+forAllSamples = forAllShrink genSampleList shrink
