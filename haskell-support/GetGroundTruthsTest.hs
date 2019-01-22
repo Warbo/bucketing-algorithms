@@ -32,10 +32,10 @@ findColon = testProperty "Can find colons" go
 
         mkStart pre post = pre ++ ":" ++ post
 
-        found pre post (_, x) = previous x === (':':reverse pre) .&&.
-                                next     x === post              .&&.
-                                out      x === ""                .&&.
-                                err      x === []
+        found pre post (_, x) = BU.previous x === (':':reverse pre) .&&.
+                                BU.next     x === post              .&&.
+                                BU.out      x === ""                .&&.
+                                BU.err      x === []
 
 subset = testGroup "Can find subsets" [
       testProperty     "Subsets are spotted" spotSubsets,
@@ -57,8 +57,8 @@ subset = testGroup "Can find subsets" [
 augmentNull = testProperty "Can handle null reps" go
   where go post = check post (BU.runOn GGT.augmentRep ("null" ++ post))
 
-        check post (_, x) = previous x === "llun" .&&.
-                            next     x === post
+        check post (_, x) = BU.previous x === "llun" .&&.
+                            BU.next     x === post
 
 type Method      = String
 type BucketCount = String
@@ -177,24 +177,24 @@ augmentArray = localOption (QuickCheckTests 10) $ testGroup "Rep handling" [
     , testProperty "Check buckets"       (go checkBuckets)
     ]
 
-  where go f (AA args) = let result = Bu.runOn GGT.augmentRep (render args)
+  where go f (AA args) = let result = BU.runOn GGT.augmentRep (render args)
                              -- Show final state if there's a failure
                           in counterexample (show ("result", result))
                                             (f args result)
 
-        checkPost args@(_, _, _, post) (_, x) = next x === post
+        checkPost args@(_, _, _, post) (_, x) = BU.next x === post
 
         checkOutput _ (_, x) =
-          let inner = parseOut (reverse (out x))
+          let inner = parseOut (reverse (BU.out x))
            in isJust inner
 
         checkMethods args@(methods, _, _, _) (_, x) =
-          let Just obj        = parseOut (reverse (out x))
+          let Just obj        = parseOut (reverse (BU.out x))
               (names, values) = unzip (Map.toList obj)
            in sort methods === sort names
 
         checkBuckets args (_, x) =
-          let Just obj    = parseOut (reverse (out x))
+          let Just obj    = parseOut (reverse (BU.out x))
               (_, values) = unzip (Map.toList obj)
            in conjoin (map (checkMethod args) values)
 
