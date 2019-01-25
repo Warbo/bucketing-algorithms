@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, OverloadedStrings, PartialTypeSignatures #-}
+{-# LANGUAGE BangPatterns, FlexibleContexts, OverloadedStrings, PartialTypeSignatures #-}
 module BucketBounds where
 
 import qualified Control.Lens               as Lens
@@ -26,6 +26,31 @@ import qualified System.Process             as P
 import           Test.QuickCheck            hiding (sample, Result)
 import           Test.Tasty                 (defaultMain, localOption, testGroup)
 import           Test.Tasty.QuickCheck      (testProperty)
+import           Text.Read                  (readMaybe)
+
+-- Entry points
+
+boundsMain :: IO ()
+boundsMain = do
+  jsonFileM <- lookupEnv "SAMPLE_JSON"
+  let jsonFile = M.fromMaybe (error "No SAMPLE_JSON env var given, aborting")
+                             jsonFileM
+  file <- openFile jsonFile ReadMode
+  BS.hGetContents file >>= Lens.traverseOf sizeSamples' processSample'
+                       >>= BS.putStr
+
+boundsTest = defaultMain $ testGroup "All tests" [
+    prop_bucketSize,
+    prop_calcSizesExact,
+    prop_calcSizesPlusOne,
+    prop_calcSizes,
+    prop_makeSizesExact,
+    prop_makeSizesRem,
+    prop_getSample,
+    prop_getReps,
+    prop_getSizes,
+    prop_collate
+  ]
 
 -- Inputs
 type Size      = Int
@@ -39,28 +64,107 @@ type BucketSize = Int
 -- Outputs
 type Count       = Int
 type Proportion  = Float
-type Proportions = Map.Map Count Proportion
+type Bucketing   = [Sample]
 
-bucketSizeForBucketCount :: Size -> Count -> BucketSize
-bucketSizeForBucketCount size count = ceiling (size % count)
+bucketSizesForBucketCount :: Size -> Count -> [BucketSize]
+bucketSizesForBucketCount size count | count > size || count == 0 = error
+  ("Can't divide " ++ show size ++ " into " ++ show count ++ "buckets")
+
+bucketSizesForBucketCount size count =
+  makeSizes count 0 (calcSizes [] size count)
 
 prop_bucketSize = testProperty "Can calculate bucket sizes to split up samples"
                                go
   where go (Positive size) (Positive count) = size >= count ==> go' size count
 
-        go' size count = let bucketSize  = bucketSizeForBucketCount size count
-                             capacity    = count *  bucketSize
-                             lowerCap    = count * (bucketSize - 1)
-                             bigEnough   = capacity >= size
-                             smallEnough = lowerCap <  size
-                             result      = property (bigEnough && smallEnough)
-                             info        = (("size"       , size       ),
-                                            ("count"      , count      ),
-                                            ("capacity"   , capacity   ),
-                                            ("lowerCap"   , lowerCap   ),
-                                            ("bigEnough"  , bigEnough  ),
-                                            ("smallEnough", smallEnough))
-                          in counterexample (show info) result
+        go' size count = let bucketSizes = bucketSizesForBucketCount size count
+                             capacity    = sum bucketSizes
+                             atCapacity  = capacity === size
+
+                             correctCount = length bucketSizes === count
+
+                             diffMaxOne = let min:_ = sort bucketSizes
+                                              diffs = map (`subtract` min) bucketSizes
+                                           in property (all (< 2) diffs)
+
+                             info = (("size"       , size       ),
+                                     ("count"      , count      ),
+                                     ("bucketSizes", bucketSizes),
+                                     ("capacity"   , capacity   ))
+
+                          in counterexample (show info)
+                                            (atCapacity   .&&.
+                                             correctCount .&&.
+                                             diffMaxOne)
+
+calcSizes :: [Int] -> Int -> Int -> [Int]
+calcSizes acc size count = if remainder == 0
+                              then reverse (multiple:acc)
+                              else calcSizes (multiple:acc) remainder (count-1)
+  where (multiple, remainder) = size `divMod` count
+
+prop_calcSizesExact = testProperty "Can calculate exactly divisible buckets" go
+  where go (Positive n) (Positive count) =
+          let size = n * count
+              got  = calcSizes [] size count
+              want = [n]
+              info = show (("n", n), ("count", count), ("size", size),
+                           ("got", got), ("want", want))
+           in counterexample info (want === got)
+
+prop_calcSizesPlusOne = testProperty "Can calculate buckets with remainder 1" go
+  where go (Positive n) (Positive count) =
+          let size = (n * count) + 1
+              got  = bucketSizesForBucketCount size count
+              want = replicate (count - 1) n ++ [n+1]
+              info = show (("n", n), ("count", count), ("size", size),
+                           ("got", got), ("want", want))
+           in counterexample info (want === got)
+
+prop_calcSizes = testProperty "Calculated sizes add up" go
+  where go (Positive size) (Positive count) =
+          size >= count ==> let sizes   = calcSizes [] size count
+                                padding = replicate (count - length sizes) 0
+                                total   = countUp 0 (sizes ++ padding)
+                                info    = show (("count"  , count  ),
+                                                ("size"   , size   ),
+                                                ("sizes"  , sizes  ),
+                                                ("padding", padding),
+                                                ("total"  , total  ))
+                            in counterexample info (total === size)
+
+        countUp !acc []       = acc
+        countUp !acc l@(x:xs) = countUp (acc + (x * length l)) xs
+
+makeSizes len acc []     = replicate len acc
+makeSizes len acc (n:ns) = n' : makeSizes (len - 1) n' ns
+  where n' = acc + n
+
+prop_makeSizesExact = testProperty "Can make exactly divided buckets" go
+  where go (Positive n) (Positive count) =
+          let size = n * count
+              got  = makeSizes count 0 [n]
+              want = replicate count n
+              info = show (("n", n), ("count", count), ("size", size),
+                           ("got", got), ("want", want))
+           in counterexample info (want === got)
+
+prop_makeSizesRem = testProperty "Can make buckets with simple remainder" go
+  where go (Positive n) (Positive count) =
+          let size = (count * n) + (count - 1)
+
+              gotCounts  = calcSizes [] size count
+              wantCounts = [n, 1]
+
+              gotSizes  = makeSizes count 0 wantCounts
+              wantSizes = n : replicate (count - 1) (n+1)
+
+              info = show (("n", n), ("count", count), ("size", size),
+                           ("gotCounts", gotCounts), ("wantCounts", wantCounts),
+                           ("gotSizes" , gotSizes ), ("wantSizes" , wantSizes ))
+           in count > 1 ==>
+              counterexample info ((gotCounts === wantCounts) .&&.
+                                   (gotSizes  === wantSizes ))
 
 -- Like 'map f xs' but also gives an index, starting from 1
 imap1 :: (Enum a, Num a) => (a -> b -> c) -> [b] -> [c]
@@ -74,11 +178,11 @@ instance Show Bound where
   show Min = "Min"
   show Max = "Max"
 
-renderModel :: Bound -> Int -> Int -> Sample -> [[Name]] -> String
-renderModel bound bCount bSize sample theorems = unlines [
+renderModel :: Bound -> [Int] -> Sample -> [[Name]] -> String
+renderModel bound bSizes sample theorems = unlines [
     "% " ++ show (("bound"      , bound          ),
                   ("bCount"     , bCount         ),
-                  ("bSize"      , bSize          ),
+                  ("bSizes"     , bSizes          ),
                   ("sample"     , sample         ),
                   ("theorems"   , theorems       ),
                   ("theoremDeps", map (\(x, y) -> (x, noAsc y)) GGT.theoremDeps)),
@@ -89,14 +193,10 @@ renderModel bound bCount bSize sample theorems = unlines [
     let declareBucket n = "var " ++ typeS ++ ": " ++ bucket n ++ ";"
      in mapLines declareBucket [1..bCount],
 
-    "% Constrain bucket sizes (cardinalities)",
-    "% bucket1 contains the remainder (which may be zero)",
-    "constraint card(bucket1) = " ++ bucketRemainder ++ ";",
-
-    "% All other buckets are constrained to be of size bSize",
-    let bSizeS      = show bSize
-        constrain n = "constraint card(" ++ bucket n ++ ") = " ++ bSizeS ++ ";"
-     in mapLines constrain [2..bCount],
+    "% Constrain bucket sizes (cardinalities). These should be the same except",
+    "% that bucket1 may contain a remainder",
+    let go (n, s) = "constraint card(" ++ bucket n ++ ") = " ++ show s ++ ";"
+     in mapLines go (zip [1..bCount] bSizes),
 
     "% Stop buckets overlapping (one constraint per distinct x/y intersection)",
     let disjoint x y | x >= y = ""  -- Avoid x == y and redundant constraints
@@ -140,9 +240,10 @@ renderModel bound bCount bSize sample theorems = unlines [
     let showBucket n = "show([ names[i] | i in " ++ bucket n ++ " ])"
      in "output [" ++ sepStrings ", \"\\n\", " showBucket [1..bCount] ++ "];"]
   where nameCount       = V.length sample
-        bucketRemainder = show (nameCount `mod` bSize)
 
-        nameCountS      = show   nameCount
+        bCount          = length bSizes
+
+        nameCountS      = show nameCount
 
         typeS    = "set of 1.." ++ nameCountS
         bucket n = "bucket" ++ show n
@@ -164,9 +265,7 @@ runModel model = P.readProcessWithExitCode "mzn-fzn"
                                            ["-f", "fzn-gecode", "-"]
                                            model >>= go
   where go (code, out, err) = case code of
-                                ExitSuccess   -> (if "UNSATISFIABLE" `isInfixOf` out
-                                                     then putStrLn ("\n\nMODEL\n\n" ++ model ++ "\n\nEND MODEL\n\n")
-                                                     else pure ()) >> pure out
+                                ExitSuccess   -> pure out
                                 ExitFailure x -> putStrLn (concat [
                                                    "EXIT CODE\n\n",
                                                    show x,
@@ -180,22 +279,21 @@ runModel model = P.readProcessWithExitCode "mzn-fzn"
 bucketCounts = [1..20]
 
 data Result = Result {
-    minimise :: Proportion,
-    maximise :: Proportion
+    minimise :: (Proportion, Bucketing),
+    maximise :: (Proportion, Bucketing)
   }
 
 runForAllCounts :: Sample -> IO (Map.Map Count (Either String Result))
 runForAllCounts sample = Map.fromList <$> mapM go possibleCounts
-  where go bucketCount = let size   = bucketSize bucketCount
+  where go bucketCount = let sizes  = bucketSizes bucketCount
                              run  b = runModel (renderModel b
-                                                            bucketCount
-                                                            size
+                                                            sizes
                                                             unhexed
                                                             theorems)
                           in do min <- run Min
                                 max <- run Max
-                                let min' = parseResult min
-                                    max' = parseResult max
+                                let min' = parseResult unhexed theorems min
+                                    max' = parseResult unhexed theorems max
                                 showErr min'
                                 showErr max'
                                 pure (bucketCount, Result <$> min' <*> max')
@@ -209,7 +307,7 @@ runForAllCounts sample = Map.fromList <$> mapM go possibleCounts
 
         sampleSize = length sample
 
-        bucketSize = bucketSizeForBucketCount sampleSize
+        bucketSizes = bucketSizesForBucketCount sampleSize
 
         theorems :: [[Name]]
         theorems = theoremsOf unhexed
@@ -217,16 +315,40 @@ runForAllCounts sample = Map.fromList <$> mapM go possibleCounts
 writeErr :: String -> IO ()
 writeErr = hPutStrLn stderr
 
-parseResult :: String -> Either String Proportion
-parseResult = Left  -- FIXME
+parseResult :: Sample -> [[Name]] -> String -> Either String
+                                                      (Proportion, Bucketing)
+parseResult sample theoremDeps out = go                          .
+                                     map readMaybe               .
+                                     filter (not . null)         .
+                                     takeWhile (/= "----------") .
+                                     lines                       $ out
+  where go :: [Maybe Sample] -> Either String (Proportion, Bucketing)
+        go parses = case sequence parses of
+          Nothing      -> Left ("Couldn't parse " ++ out)
+          Just buckets -> let got  = sum                                    .
+                                     map (length . theoremsOf' theoremDeps) .
+                                     check                                  $
+                                     buckets
+                              want = length theoremDeps
+                           in Right (fromIntegral got / fromIntegral want,
+                                     buckets)
+
+        check :: [Sample] -> [Sample]
+        check buckets = case filter (`notElem` V.toList sample)
+                                    (concatMap V.toList buckets) of
+                          [] -> buckets
+                          xs -> error (show (("error",
+                                              "Parsed names not in sample"),
+                                             ("parsed", xs),
+                                             ("sample", sample)))
+
+theoremsOf' :: [[Name]] -> Sample -> [[Name]]
+theoremsOf' theoremDeps sample = filter (`GGTH.subset` ascSample) theoremDeps
+  where ascSample = GGTH.mkAscendingList (V.toList sample)
 
 theoremsOf :: Sample -> [[Name]]
-theoremsOf sample = check                            .
-                    --map unasc                        .
-                    filter (`GGTH.subset` ascSample) $
-                    unwrappedTheoremDeps
-  where ascSample = GGTH.mkAscendingList (V.toList sample)
-        check l = if null l
+theoremsOf sample = check (theoremsOf' unwrappedTheoremDeps sample)
+  where check l = if null l
                      then error (show (
                             ("error", "Sample should admit at least 1 theorem"),
                             ("sample", sample),
@@ -252,9 +374,16 @@ processSample s = do r <- rendered
   where rendered :: IO A.Value
         rendered = A.toJSON . Map.map render <$> runForAllCounts s
 
-        render (Left  s) = A.object ["ok" A..= False, "error" A..= s         ]
-        render (Right r) = A.object ["ok" A..= True , "min"   A..= minimise r,
-                                                      "max"   A..= maximise r]
+        render (Left  s) = A.object ["ok"  A..= False     , "error" A..= s         ]
+        render (Right r) = A.object ["ok"  A..= True      ,
+                                     "min" A..= let (p, b) = minimise r
+                                                 in A.object [
+                                                      "proportion" A..= p,
+                                                      "buckets"    A..= b],
+                                     "max" A..= let (p, b) = maximise r
+                                                 in A.object [
+                                                      "proportion" A..= p,
+                                                      "buckets"    A..= b]]
 
 decodeSample :: Prism' RawSample Sample
 decodeSample = Lens.prism encodeSample decodeSample''
@@ -291,27 +420,6 @@ processSample' (A.Array v) = case decodeSample'' v of
                                Left  x -> error ("Couldn't decode " ++ show x)
                                Right s -> processSample s
 processSample' x = error ("processSample' needed an Array, given " ++ show x)
-
-boundsMain :: IO ()
-boundsMain = do
-  jsonFileM <- lookupEnv "SAMPLE_JSON"
-  let jsonFile = M.fromMaybe (error "No SAMPLE_JSON env var given, aborting")
-                             jsonFileM
-  file <- openFile jsonFile ReadMode
-  -- WE NEED TO READ IN THE JSON, AND USE A LENS OPERATION LIKE over TO MODIFY
-  -- EACH OF THE SAMPLES, REPLACING THEM WITH A PROCESSED VERSION. WE NEED IO'S
-  -- APPLICATIVE INSTANCE TO DO THAT, AND A FUNCTION TO ACTUALLY PIPE THE DATA
-  -- THROUGH MiniZinc
-  BS.hGetContents file >>= Lens.traverseOf sizeSamples' processSample'
-                       >>= BS.putStr
-
-boundsTest = defaultMain $ testGroup "All tests" [
-    prop_collate,
-    prop_bucketSize,
-    prop_getSample,
-    prop_getReps,
-    prop_getSizes
-  ]
 
 prop_getSample = testProperty "Can look up 'sample' from object" go
   where go names = canGetSample names (mkObj names)
@@ -380,26 +488,6 @@ renderObject xs = "{" ++ intercalate "," (map join xs) ++ "}"
                                            ("val"  , y)))
         check "" = False
         check x  = head x == '"' && last x == '"'
-
-{-
-prop_getSample = testProperty "Can get samples" go
-  where go :: Int -> Sample -> Bool
-        go reps names = let reps' = abs reps + 1
-                            names' = filter (not . null) names
-                         in check reps' names' (render reps' names' [])
-
-        check :: Int -> Sample -> String -> Bool
-        check reps names str = str & sample
-
-        render reps []       acc = toJSON (Map.fromList acc)
-        render reps (ns:nss) acc = render reps nss (mkReps ns reps []:acc)
-
-        mkReps ns 0    acc = (length ns, acc)
-        mkReps ns reps acc = mkReps (rotate ns) (reps - 1) (ns:acc)
-
-rotate []     = []
-rotate (x:xs) = xs ++ [x]
--}
 
 -- Test helpers
 
