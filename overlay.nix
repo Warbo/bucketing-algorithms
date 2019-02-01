@@ -137,6 +137,7 @@ fold appendDef
     "bucketRunner"
     "calculateProportions"
     "composeBins"
+    "extractSampleJSON"
     "ghcWithML4HSFE"
     "hashBucket"
     "haskellTE"

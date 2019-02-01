@@ -1,5 +1,5 @@
 # Fetches benchmark run results from git and extracts the samples from them.
-with import <nixpkgs> {};
+{ fetchgit, jq, lzip, runCommand }:
 runCommand "samples.json"
   {
     buildInputs = [ jq lzip ];
