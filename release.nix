@@ -3,6 +3,6 @@
 # tests, benchmarks, etc.
 with import ./.;
 {
-  inherit benchmark package;
+  inherit benchmark bucketBounds package;
   proportionExperiment = { inherit (proportionExperiment) test; };
 }
