@@ -141,6 +141,7 @@ fold appendDef
     "ghcWithML4HSFE"
     "hashBucket"
     "haskellTE"
+    "haskellTESrc"
     "makeSamples"
     "nix-helpers"
     "package"
