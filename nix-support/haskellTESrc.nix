@@ -4,8 +4,8 @@
 latestGit {
   url    = "https://github.com/Warbo/haskell-te.git";
   stable = {
-    rev        = "5e98338";
-    sha256     = "1wlm17kkhblmq7d9yzfmqs4n9qilw8bxmyznv4lbqh2rl3311l5w";
+    rev        = "24475a2";
+    sha256     = "0w1mfvqfkh0hvzbcks4pnj56n9w6xvifydhqvqfb894mj2cajyaf";
     unsafeSkip = false;
   };
 }
