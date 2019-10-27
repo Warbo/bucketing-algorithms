@@ -1,4 +1,4 @@
-{ coreutils, wrap }:
+{ bash, coreutils, wrap }:
 
 with builtins;
 with rec {
@@ -7,7 +7,7 @@ with rec {
         then { file = "${coreutils}/bin/cat"; }
         else {
                script = ''
-                 #!/usr/bin/env bash
+                 #!${bash}/bin/bash
                  "${head bins}" | "${go (name + "_") (tail bins)}"
                '';
              }));

@@ -14,7 +14,7 @@ with rec {
       util    = ../haskell-support/BucketUtil.hs;
     };
     script = ''
-      #!/usr/bin/env bash
+      #!${bash}/bin/bash
       cp "$helper1" Helper.hs
       cp "$helper2" GetGroundTruths.hs
       cp "$util"    BucketUtil.hs

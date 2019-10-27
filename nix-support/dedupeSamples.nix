@@ -2,12 +2,12 @@
 
 with builtins;
 with rec {
-  go = wrap {
+  go = with { py = python3.withPackages (p: []); }; wrap {
     name   = "dedupe.py";
-    paths  = [ (python3.withPackages (p: [])) ];
+    paths  = [ py ];
     vars   = { LANG = "en_US.UTF-8"; };
     script = ''
-      #!/usr/bin/env python3
+      #!${py}/bin/python3
       import json
       import sys
 

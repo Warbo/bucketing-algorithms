@@ -12,7 +12,7 @@ with rec {
     name   = "unlzip";
     paths  = [ bash lzip ];
     script = ''
-      #!/usr/bin/env bash
+      #!${bash}/bin/bash
       exec lzip -d "$@"
     '';
   };

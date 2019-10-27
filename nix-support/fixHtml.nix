@@ -38,12 +38,14 @@ with rec {
   '';
 
   replacements = mapAttrs mkCode resources;
+
+  py = python.withPackages (p: []);
 };
 mkBin {
   name   = "fixHtml";
-  paths  = [ (python.withPackages (p: [])) ];
+  paths  = [ py ];
   script = ''
-    #!/usr/bin/env python
+    #!${py}/bin/python
     import sys
     if len(sys.argv) < 2:
       raise Exception("Need ASV dir as arg")

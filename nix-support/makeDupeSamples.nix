@@ -7,7 +7,7 @@ with rec {
     paths  = [ tebenchmark.env ];
     vars   = tebenchmark.cache;
     script = ''
-      #!/usr/bin/env racket
+      #!${tebenchmark.env}/bin/racket
       #lang racket
       (require json)
       (require lib/sampling)

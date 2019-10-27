@@ -39,7 +39,7 @@ fixed.mkBin {
           :q
         ''; };
         script = ''
-          #!/usr/bin/env bash
+          #!${fixed.nixpkgs1609.bash}/bin/bash
           set -e
           # Use nix-repl or nix repl to evaluate $expr
           if command -v nix-repl 1> /dev/null 2> /dev/null
@@ -63,12 +63,12 @@ fixed.mkBin {
       # Rather than taking makeDupeSamples directly from benchmarkingCommands,
       # we wrap it with a Python script to avoid spewing info messages to stderr
       # and to set the env vars that are needed to control the sampling.
-      sample = with fixed; wrap {
+      sample = with fixed; with { py = python3.withPackages (p:[]); }; wrap {
         name   = "sample";
-        paths  = [ (python3.withPackages (p:[])) ];
+        paths  = [ py ];
         vars   = { reps  = "2"; sizes = toJSON (range 1 100); };
         script = ''
-          #!/usr/bin/env python3
+          #!${py}/bin/python3
           import re
           import subprocess
           import sys
@@ -137,7 +137,7 @@ fixed.mkBin {
     }) bucketed samples ;
   };
   script = ''
-    #!/usr/bin/env bash
+    #!${fixed.nixpkgs1609.bash}/bin/bash
     exec python3 "$@"
   '';
 }
