@@ -13,15 +13,21 @@ import qualified Data.Text                  as T
 import qualified Data.Vector                as V
 import           Debug.Trace                (traceShow)
 import qualified GetGroundTruths            as GGT
+import           GHC.IO.Encoding            (setLocaleEncoding, utf8)
 import qualified Helper
 import           Numeric                    (showHex)
 import           Test.QuickCheck
 import           Test.Tasty                 (defaultMain, localOption, testGroup)
 import           Test.Tasty.QuickCheck      (QuickCheckTests(..), testProperty)
 
-main = defaultMain $ testGroup "All tests" [
-    augmentArray, augmentNull, findColon, subset
-  ]
+main = do
+  setLocaleEncoding utf8
+  defaultMain $ testGroup "All tests" [
+      augmentArray
+    , augmentNull
+    , findColon
+    , subset
+    ]
 
 findColon = testProperty "Can find colons" go
   where go :: String -> Int -> Property
