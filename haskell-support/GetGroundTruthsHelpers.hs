@@ -54,7 +54,7 @@ instance L.FromLisp TheoremDeps where
     where toPair [Left id, Right deps] = (id, deps)
 
 -- Lists which we assume are sorted
-newtype AscendingList a = AscendingList [a]
+newtype AscendingList a = AscendingList { unAsc :: [a] } deriving (Eq, Show)
 
 mkAscendingList :: Ord a => [a] -> AscendingList a
 mkAscendingList = AscendingList . List.sort
