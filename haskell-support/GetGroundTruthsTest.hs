@@ -29,6 +29,74 @@ main = do
     , subset
     ]
 
+augmentArray = localOption (QuickCheckTests 3) $ testGroup "Rep handling" [
+      testProperty "Read whole array"    (go checkPost   )
+    , testProperty "Output is parseable" (go checkOutput )
+    , testProperty "Have right methods"  (go checkMethods)
+    , testProperty "Check buckets"       (go checkBuckets)
+    ]
+
+  where go f (AA args) = let result = BU.runOn GGT.augmentRep (render args)
+                             -- Show final state if there's a failure
+                          in counterexample (show ("result", result))
+                                            (f args result)
+
+        checkPost args@(_, _, _, post) (_, x) = BU.next x === post
+
+        checkOutput _ (_, x) =
+          let inner = parseOut (reverse (BU.out x))
+           in isJust inner
+
+        checkMethods args@(methods, _, _, _) (_, x) =
+          let Just obj        = parseOut (reverse (BU.out x))
+              (names, values) = unzip (Map.toList obj)
+           in sort methods === sort names
+
+        checkBuckets args (_, x) =
+          let Just obj    = parseOut (reverse (BU.out x))
+              (_, values) = unzip (Map.toList obj)
+           in conjoin (map (checkMethod args) values)
+
+        checkMethod args@(_, sizes, _, _) obj =
+          let (names, values) = unzip (Map.toList obj)
+              namesMatch = sort names === sort (map fst sizes)
+           in counterexample "Bucket sizes as requested" namesMatch .&&.
+              conjoin (map (checkBucket args) values)
+
+        checkBucket (_, _, names, _) lst =
+          let ns   = map nameToString names
+              ok n = counterexample (show (("test", "Names come from sample"),
+                                           ("name" , n                      ),
+                                           ("names", ns                     )))
+                                    (property (n `elem` ns))
+           in conjoin (map ok (concat lst))
+
+        render args@(methods, sizes, names, post) =
+          let sample = Map.fromList [("sampleNames", map nameToString names)]
+
+              obj = (Map.fromList (map (\m -> (m, renderMethod args))
+                                       methods)) :: Map.Map String
+                                                            (Map.Map String
+                                                                     [[String]])
+           in LB.unpack (A.encode (sample, obj)) ++ post
+
+        renderMethod args@(_, sizes, _, _) =
+          Map.fromList (map (\(s, content) -> (s, renderBucket args content))
+                            sizes)
+
+        renderBucket (_, _, names, _) content =
+          let ns       = map nameToString names
+              select n = if n < length ns
+                            then ns !! n  -- Safe thanks to our Arbitrary instance
+                            else error (show ("length ns", length ns, "n", n))
+           in map (map select) content
+
+augmentNull = testProperty "Can handle null reps" go
+  where go post = check post (BU.runOn GGT.augmentRep ("null" ++ post))
+
+        check post (_, x) = BU.previous x === "llun" .&&.
+                            BU.next     x === post
+
 findColon = testProperty "Can find colons" go
   where go :: String -> Int -> Property
         go post n = forAll (genSpace n) (canFind post)
@@ -60,11 +128,7 @@ subset = testGroup "Can find subsets" [
         spotNonSubsets xs ys = not (null (filter (`notElem` ys) xs)) ==>
           property (not (xs `Helper.subset` (Helper.mkAscendingList ys)))
 
-augmentNull = testProperty "Can handle null reps" go
-  where go post = check post (BU.runOn GGT.augmentRep ("null" ++ post))
-
-        check post (_, x) = BU.previous x === "llun" .&&.
-                            BU.next     x === post
+-- Helpers
 
 type Method      = String
 type BucketCount = String
@@ -176,68 +240,6 @@ instance Arbitrary ArrayArgs where
                           else [AA (methods, sizes, names, post') |
                                 post' <- halves post]
 
-augmentArray = localOption (QuickCheckTests 10) $ testGroup "Rep handling" [
-      testProperty "Read whole array"    (go checkPost   )
-    , testProperty "Output is parseable" (go checkOutput )
-    , testProperty "Have right methods"  (go checkMethods)
-    , testProperty "Check buckets"       (go checkBuckets)
-    ]
-
-  where go f (AA args) = let result = BU.runOn GGT.augmentRep (render args)
-                             -- Show final state if there's a failure
-                          in counterexample (show ("result", result))
-                                            (f args result)
-
-        checkPost args@(_, _, _, post) (_, x) = BU.next x === post
-
-        checkOutput _ (_, x) =
-          let inner = parseOut (reverse (BU.out x))
-           in isJust inner
-
-        checkMethods args@(methods, _, _, _) (_, x) =
-          let Just obj        = parseOut (reverse (BU.out x))
-              (names, values) = unzip (Map.toList obj)
-           in sort methods === sort names
-
-        checkBuckets args (_, x) =
-          let Just obj    = parseOut (reverse (BU.out x))
-              (_, values) = unzip (Map.toList obj)
-           in conjoin (map (checkMethod args) values)
-
-        checkMethod args@(_, sizes, _, _) obj =
-          let (names, values) = unzip (Map.toList obj)
-              namesMatch = sort names === sort (map fst sizes)
-           in counterexample "Bucket sizes as requested" namesMatch .&&.
-              conjoin (map (checkBucket args) values)
-
-        checkBucket (_, _, names, _) lst =
-          let ns   = map nameToString names
-              ok n = counterexample (show (("test", "Names come from sample"),
-                                           ("name" , n                      ),
-                                           ("names", ns                     )))
-                                    (property (n `elem` ns))
-           in conjoin (map ok (concat lst))
-
-        render args@(methods, sizes, names, post) =
-          let sample = Map.fromList [("sampleNames", map nameToString names)]
-
-              obj = (Map.fromList (map (\m -> (m, renderMethod args))
-                                       methods)) :: Map.Map String
-                                                            (Map.Map String
-                                                                     [[String]])
-           in LB.unpack (A.encode (sample, obj)) ++ post
-
-
-        renderMethod args@(_, sizes, _, _) =
-          Map.fromList (map (\(s, content) -> (s, renderBucket args content))
-                            sizes)
-
-        renderBucket (_, _, names, _) content =
-          let ns       = map nameToString names
-              select n = if n < length ns
-                            then ns !! n  -- Safe thanks to our Arbitrary instance
-                            else error (show ("length ns", length ns, "n", n))
-           in map (map select) content
 
 parseOut :: String -> Maybe (Map.Map Method (Map.Map BucketCount [[String]]))
 parseOut s = do
