@@ -147,7 +147,6 @@ fold appendDef
     "package"
     "proportionExperiment"
     "recurrentBucket"
-    "runCabal2nix"
     "runOn"
     "tebenchmark"
   ]
