@@ -33,6 +33,11 @@ with rec {
         (self: super:
           with {
             inherit (haskell.lib) dontCheck;
+
+            # These nixpkgs definitions come from cabal2nix running with GHC 8,
+            # where base contains Semigroup. Since we're using GHC 7, we need to
+            # add a dependency on semigroups to some packages.
+            forceSemigroups = p: haskell.lib.addBuildDepend p self.semigroups;
           };
           (if profile then profiler super else {}) // {
           # Tests can fail due to missing Arbitrary instances
@@ -67,10 +72,7 @@ with rec {
           # We use QuickSpec version 1 (0.9.6) since version 2+ is very different
           quickspec = self.callHackage "quickspec" "0.9.6" {};
 
-          # This package was converted to Nix in the context of GHC 8, but it
-          # depends on semigroups when using GHC 7.
-          system-filepath = haskell.lib.addBuildDepend super.system-filepath
-                                                       self.semigroups;
+          system-filepath = forceSemigroups super.system-filepath;
         });
     });
 
