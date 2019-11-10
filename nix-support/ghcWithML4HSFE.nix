@@ -32,12 +32,13 @@ with rec {
         (old.overrides or (_: _: {}))
         (self: super:
           with {
+            inherit (haskell.lib) dontCheck;
           };
           (if profile then profiler super else {}) // {
           # Tests can fail due to missing Arbitrary instances
-          aeson      = haskell.lib.dontCheck super.aeson;
-          lens       = haskell.lib.dontCheck super.lens;
-          lens-aeson = haskell.lib.dontCheck super.lens-aeson;
+          aeson      = dontCheck super.aeson;
+          lens       = dontCheck super.lens;
+          lens-aeson = dontCheck super.lens-aeson;
 
           # Dependency of ML4HSFE. Note that this needs GHC 7.10, due to changes
           # in GHC's package DB implementation.
