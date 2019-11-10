@@ -4,6 +4,8 @@ module Main where
 
 import qualified BucketUtil                 as BU
 import           Control.Monad.State.Strict (get, put, replicateM_, runState, State)
+import           Criterion                  (benchmark', env, nf)
+import           Criterion.Types            (anMean, reportAnalysis)
 import qualified Data.Aeson                 as A
 import qualified Data.ByteString.Lazy.Char8 as LB
 import           Data.Char                  (isAscii, isPrint, ord)
@@ -18,6 +20,7 @@ import qualified GetGroundTruths            as GGT
 import           GHC.IO.Encoding            (setLocaleEncoding, utf8)
 import qualified Helper
 import           Numeric                    (showHex)
+import           Statistics.Types           (estPoint)
 import           Test.QuickCheck
 import           Test.Tasty                 (defaultMain, localOption, testGroup)
 import           Test.Tasty.QuickCheck      (QuickCheckTests(..), testProperty)
@@ -27,6 +30,7 @@ main = do
   defaultMain $ testGroup "All tests" [
       augmentArray
     , augmentNull
+    , benchmarks
     , findColon
     , subset
     ]
@@ -76,10 +80,9 @@ augmentArray = localOption (QuickCheckTests 3) $ testGroup "Rep handling" [
         render args@(methods, sizes, names, post) =
           let sample = Map.fromList [("sampleNames", map nameToString names)]
 
-              obj = (Map.fromList (map (\m -> (m, renderMethod args))
-                                       methods)) :: Map.Map String
-                                                            (Map.Map String
-                                                                     [[String]])
+              obj :: Map.Map String (Map.Map String [[String]])
+              obj = Map.fromList $ map (\m -> (m, renderMethod args))
+                                       methods
            in LB.unpack (A.encode (sample, obj)) ++ post
 
         renderMethod args@(_, sizes, _, _) =
@@ -98,6 +101,41 @@ augmentNull = testProperty "Can handle null reps" go
 
         check post (_, x) = BU.previous x === "llun" .&&.
                             BU.next     x === post
+
+benchmarks = testGroup "Benchmarks" [
+      ("subsetAsc", uncurry Helper.subsetAsc) `beats`
+      ("subset"   , uncurry subset'         ) $ do xs <- genAscNames 10
+                                                   ys <- genAscNames 1000
+                                                   return (xs, ys)
+    ]
+  where beats (fastName, fastF) (slowName, slowF) gen =
+          testProperty (fastName ++ " beats " ++ slowName)
+                       (once . ioProperty $ do
+                         -- Generate an input out here, so it's shared
+                         input    <- generate gen
+
+                         -- Use 'env' to force input before benchmarking
+                         fastTime <- meanTime (nf fastF input)
+                         slowTime <- meanTime (nf slowF input)
+
+                         return $
+                           counterexample (show (("fastTime", fastTime)
+                                                 ,("slowTime", slowTime)))
+                                          (property (fastTime < slowTime)))
+
+        meanTime b = estPoint . anMean . reportAnalysis <$> benchmark' b
+
+        subset' xs = subset (Helper.unAsc xs)
+
+        subset :: Ord a => [a] -> Helper.AscendingList a -> Bool
+        subset xs ays@(Helper.AscendingList ys) = case xs of
+            []     -> True
+            (x:xs) -> (x `isIn` ys) && (xs `subset` ays)
+          where x `isIn` []     = False
+                x `isIn` (y:ys) = case x `compare` y of
+                                    LT -> False  -- x < y implies all (x <) ys
+                                    EQ -> True
+                                    GT -> x `isIn` ys
 
 findColon = testProperty "Can find colons" go
   where go :: String -> Int -> Property
@@ -121,14 +159,15 @@ subset = testGroup "Can find subsets" [
         spotSubsets x xs indices =
           let super  = nub (x:xs)
               super' = Helper.mkAscendingList super
-              sub    = nub (map get indices)
+              sub    = Helper.mkAscendingList (nub (map get indices))
               get i  = super !! (abs i `mod` length super)
            in counterexample (show (("sub", sub), ("super", super)))
-                (property (sub `Helper.subset` super'))
+                (property (sub `Helper.subsetAsc` super'))
 
         spotNonSubsets :: [Int] -> [Int] -> Property
         spotNonSubsets xs ys = not (null (filter (`notElem` ys) xs)) ==>
-          property (not (xs `Helper.subset` (Helper.mkAscendingList ys)))
+          property (not (Helper.mkAscendingList xs `Helper.subsetAsc`
+                         Helper.mkAscendingList ys))
 
 -- Helpers
 
