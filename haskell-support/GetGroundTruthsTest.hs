@@ -103,10 +103,6 @@ augmentNull = testProperty "Can handle null reps" go
                             BU.next     x === post
 
 benchmarks = testGroup "Benchmarks" [
-      ("subsetAsc", uncurry Helper.subsetAsc) `beats`
-      ("subset"   , uncurry subset'         ) $ do xs <- genAscNames 10
-                                                   ys <- genAscNames 1000
-                                                   return (xs, ys)
     ]
   where beats (fastName, fastF) (slowName, slowF) gen =
           testProperty (fastName ++ " beats " ++ slowName)
@@ -125,17 +121,6 @@ benchmarks = testGroup "Benchmarks" [
 
         meanTime b = estPoint . anMean . reportAnalysis <$> benchmark' b
 
-        subset' xs = subset (Helper.unAsc xs)
-
-        subset :: Ord a => [a] -> Helper.AscendingList a -> Bool
-        subset xs ays@(Helper.AscendingList ys) = case xs of
-            []     -> True
-            (x:xs) -> (x `isIn` ys) && (xs `subset` ays)
-          where x `isIn` []     = False
-                x `isIn` (y:ys) = case x `compare` y of
-                                    LT -> False  -- x < y implies all (x <) ys
-                                    EQ -> True
-                                    GT -> x `isIn` ys
 
 findColon = testProperty "Can find colons" go
   where go :: String -> Int -> Property
