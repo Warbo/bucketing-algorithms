@@ -6,7 +6,7 @@ with rec {
   # Takes a "Main" file and compiles it, with some fixed dependencies
   buildMain = main: mkBin {
     name   = "buildMain";
-    paths  = [ bash (ghcWithML4HSFE {}) ];
+    paths  = [ bash (ghcWithML4HSFE { extraPkgs = [ "criterion" ]; }) ];
     vars   = {
       inherit main;
       helper1 = ../haskell-support/GetGroundTruthsHelpers.hs;
