@@ -45,6 +45,9 @@ with rec {
           lens       = dontCheck super.lens;
           lens-aeson = dontCheck super.lens-aeson;
 
+          # Newer versions depend on QuickCheck >= 2.10
+          cassava = self.callHackage "cassava" "0.4.5.1" {};
+
           # Dependency of ML4HSFE. Note that this needs GHC 7.10, due to changes
           # in GHC's package DB implementation.
           HS2AST = getRepo {
@@ -65,14 +68,21 @@ with rec {
           };
 
           # If this is 2.10+ then quickspec 0.9.6 hits an "ambiguous 'total'"
-          # error. Version 2.9 hits problems elsewhere, with semigroups, instances
-          # and quickcheck-io packages.
+          # error. Version 2.9 hits problems elsewhere, with semigroups,
+          # instances and quickcheck-io packages.
           QuickCheck = self.callHackage "QuickCheck" "2.8.2" {};
+
+          # Versions above this need QuickCHeck > 2.8
+          quickcheck-instances =
+            self.callHackage "quickcheck-instances" "0.3.13" {};
 
           # We use QuickSpec version 1 (0.9.6) since version 2+ is very different
           quickspec = self.callHackage "quickspec" "0.9.6" {};
 
           system-filepath = forceSemigroups super.system-filepath;
+
+          # "isAscii" tests fail for empty strings; seems harmless
+          text-short = forceSemigroups (dontCheck super.text-short);
         });
     });
 
