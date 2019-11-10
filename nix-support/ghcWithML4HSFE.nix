@@ -1,13 +1,13 @@
 # ML4HSFE executable from its Haskell package, with its test script checked
-{ fetchFromGitHub,fetchurl,  haskell, jq, nixpkgs1803, runCabal2nix, runCommand,
-  unpack, withDeps }:
+{ fetchFromGitHub, fetchurl, haskell, jq, nixpkgs1803, runCommand, unpack,
+  withDeps }:
 
 with builtins;
 with rec {
   getRepo = { name, repo, rev, self, sha256 }:
-    self.callPackage (runCabal2nix {
+    self.callPackage (nixpkgs1803.haskellPackages.haskellSrc2nix {
       inherit name;
-      url = fetchFromGitHub {
+      src = fetchFromGitHub {
         inherit repo rev sha256;
         owner = "Warbo";
       };
