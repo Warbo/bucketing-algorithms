@@ -59,18 +59,18 @@ newtype AscendingList a = AscendingList { unAsc :: [a] } deriving (Eq, Show)
 mkAscendingList :: Ord a => [a] -> AscendingList a
 mkAscendingList = AscendingList . List.sort
 
+-- | Check whether the first AscendingList is a subset of the second. This is
+--   faster than comparing with (one or two) unordered lists, since we can
+--   discard small elements as they're encountered, knowing they won't appear
+--   further down the lists.
 subsetAsc :: Ord a => AscendingList a -> AscendingList a -> Bool
-subsetAsc (AscendingList xs) = subset xs
-
-subset :: Ord a => [a] -> AscendingList a -> Bool
-subset xs ays@(AscendingList ys) = case xs of
-    []     -> True
-    (x:xs) -> (x `isIn` ys) && (xs `subset` ays)
-  where x `isIn` []     = False
-        x `isIn` (y:ys) = case x `compare` y of
-                            LT -> False  -- x < y implies all (x <) ys
-                            EQ -> True
-                            GT -> x `isIn` ys
+subsetAsc (AscendingList l1) (AscendingList l2) = go l1 l2
+  where go []     _          = True
+        go _      []         = False
+        go a@(x:xs) b@(y:ys) = case x `compare` y of
+                                 LT -> False
+                                 EQ -> go xs b
+                                 GT -> go a  ys
 
 decodeName (N n) = case M.catMaybes [T.stripPrefix "global" n,
                                      T.stripPrefix "Global" n] of
