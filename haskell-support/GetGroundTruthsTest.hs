@@ -19,7 +19,19 @@ import           Debug.Trace                (traceShow)
 import qualified GetGroundTruths            as GGT
 import           GHC.IO.Encoding            (setLocaleEncoding, utf8)
 import qualified Helper
+import           Helper                     ( addTrie
+                                            , AscendingList(..)
+                                            , checkTrie
+                                            , listToTrie
+                                            , mkAscendingList
+                                            , Name(..)
+                                            , sortUniq
+                                            , Trie(..)
+                                            , trieSubsets
+                                            , zTrie
+                                            )
 import           Numeric                    (showHex)
+import           Numeric.Natural
 import           Statistics.Types           (estPoint)
 import           Test.QuickCheck
 import           Test.Tasty                 (defaultMain, localOption, testGroup)
@@ -31,8 +43,10 @@ main = do
       augmentArray
     , augmentNull
     , benchmarks
+    , canSortUniq
     , findColon
     , subset
+    , tries
     ]
 
 augmentArray = localOption (QuickCheckTests 3) $ testGroup "Rep handling" [
@@ -103,6 +117,9 @@ augmentNull = testProperty "Can handle null reps" go
                             BU.next     x === post
 
 benchmarks = testGroup "Benchmarks" [
+      ("trie lookup", map GGT.theoremFilesAdmittedBy  ) `beats`
+      ("list lookup", map GGT.theoremFilesAdmittedTrie) $
+      vectorOf 1000 (genAscNames 50)
     ]
   where beats (fastName, fastF) (slowName, slowF) gen =
           testProperty (fastName ++ " beats " ++ slowName)
@@ -121,6 +138,108 @@ benchmarks = testGroup "Benchmarks" [
 
         meanTime b = estPoint . anMean . reportAnalysis <$> benchmark' b
 
+tries = testGroup "Trie tests" [addCommutes, buildTrie, checkAddTrie]
+
+addCommutes = testProperty "Adding to a Trie doesn't care about order" go
+  where go :: Int -> Int -> String -> String -> [String] -> [String] -> Property
+        go t1 t2 d1 d2 deps1 deps2 = let
+            trie12 = addTrie t2 l2 (addTrie t1 l1 zTrie)
+            trie21 = addTrie t1 l1 (addTrie t2 l2 zTrie)
+
+            l1 = sortUniq (d1:deps1)
+            l2 = sortUniq (d2:deps2)
+
+          in l1 /= l2 ==> trie12 === trie21
+
+buildTrie = testProperty "Can build trie of theorem dependencies" go
+  where go :: [[Dep]] -> Dep -> [Dep] -> Natural -> [Dep] -> Property
+        go deps d ds n extra =
+          let -- Prepend d to ensure the list is non-empty. We will use this as
+              -- a set of dependencies for a theorem, then try looking it up.
+              want = d:ds
+
+              -- Every theorem should have at least one dep
+              deps' = filter (not . null) deps
+
+              -- Pick a theorem ID to associate with want. We will assign IDs
+              -- sequentially, so this can't be larger than the total number of
+              -- deps sets (including want).
+              wantID = fromIntegral n `mod` (length deps' + 1)
+
+              -- Insert want into deps' such that it gets assigned to wantID
+              deps'' :: [[Dep]]
+              deps'' = map fixDeps $
+                         take wantID deps' ++ [want] ++ drop wantID deps'
+
+              -- Assign IDs using zip and build a trie
+              trie :: Trie Int Dep
+              trie = listToTrie (zip [0..] deps'')
+
+              -- Our query should work for any superset of want, so we allow it
+              -- to be extended with extra deps to check this.
+              query :: [Dep]
+              query = fixDeps (want ++ extra)
+
+              -- Look up theorem IDs whose deps are subsets of our query
+              got :: [Int]
+              got = Helper.trieSubsets (mkAscendingList query) trie
+
+              -- Querying for a superset of want should always find wantID
+              foundWant = counterexample (show (("error" , "Didn't get wantID")
+                                               ,("want"  , want               )
+                                               ,("wantID", wantID             )
+                                               ,("query" , query              )
+                                               ,("got"   , got                )
+                                               ,("deps''", deps''             )
+                                               ,("trie"  , trie               )
+                                               ,("extra" , extra              )
+                                               ))
+                                         (property (wantID `elem` got))
+
+              -- Only subsets of our query should be returned
+              gotSubset t p = p .&&. counterexample
+                (show (("error" , "Result not in query")
+                      ,("query" , query                )
+                      ,("result", t                    )
+                      ,("got"   , got                  )
+                      ,("all"   , map (deps'' !!) got  )
+                      ))
+                (property (all (`elem` query)
+                               (deps'' !! t)))
+
+           in foldr gotSubset foundWant got
+
+-- Removes dupes and sorts, turning a list of names into valid deps
+fixDeps :: Ord a => [a] -> [a]
+fixDeps = nub . sort
+
+checkAddTrie = testProperty "addTrie passes checks" go
+  where go :: [[String]] -> Int -> [String] -> Property
+        go pre t deps = let
+            pre' = map fixDeps (filter (not . null) pre)
+
+            trie = listToTrie (zip [0..] pre')
+
+            deps'  = mkAscendingList (fixDeps deps)
+
+            result = addTrie t deps' trie
+          in checkTrie trie == [] ==> checkTrie result === []
+
+canSortUniq = testProperty "sortUniq sorts and removes dupes" go
+  where go :: [(Natural, Int)] -> Property
+        go given = check (mkWant given) (Helper.sortUniq (fromFreqs given))
+
+        fromFreqs []          = []
+        fromFreqs ((0, _):xs) =     fromFreqs           xs
+        fromFreqs ((n, x):xs) = x : fromFreqs ((n-1, x):xs)
+
+        mkWant :: [(Natural, Int)] -> [Int]
+        mkWant = nub . sort . foldl' add []
+
+        add xs (0, _) =   xs
+        add xs (_, x) = x:xs
+
+        check want (AscendingList got) = want === got
 
 findColon = testProperty "Can find colons" go
   where go :: String -> Int -> Property
@@ -143,24 +262,25 @@ subset = testGroup "Can find subsets" [
   where spotSubsets :: Int -> [Int] -> [Int] -> Property
         spotSubsets x xs indices =
           let super  = nub (x:xs)
-              super' = Helper.mkAscendingList super
-              sub    = Helper.mkAscendingList (nub (map get indices))
+              super' = mkAscendingList super
+              sub    = mkAscendingList (nub (map get indices))
               get i  = super !! (abs i `mod` length super)
            in counterexample (show (("sub", sub), ("super", super)))
                 (property (sub `Helper.subsetAsc` super'))
 
         spotNonSubsets :: [Int] -> [Int] -> Property
         spotNonSubsets xs ys = not (null (filter (`notElem` ys) xs)) ==>
-          property (not (Helper.mkAscendingList xs `Helper.subsetAsc`
-                         Helper.mkAscendingList ys))
+          property (not (mkAscendingList xs `Helper.subsetAsc`
+                         mkAscendingList ys))
 
 -- Helpers
 
+type Dep         = String
 type Method      = String
 type BucketCount = String
 
 newtype ArrayArgs = AA
-  ([Method], [(String, [[Int]])], [Helper.Name], String)
+  ([Method], [(String, [[Int]])], [Name], String)
   deriving (Show, Eq)
 
 checkArgs :: ArrayArgs -> ArrayArgs
@@ -306,8 +426,11 @@ encodeName (Helper.N t) = Helper.N (T.append (T.pack "global")
                                              (T.foldl' encode (T.pack "") t))
   where encode s c = T.append s (T.pack (showHex (ord c) ""))
 
-instance Arbitrary Helper.Name where
+instance Arbitrary Name where
   arbitrary = encodeName <$> elements depNames
 
 depNames = nub (concatMap get GGT.theoremDeps)
-  where get (_, Helper.AscendingList deps) = deps
+  where get (_, AscendingList deps) = deps
+
+genAscNames :: Int -> Gen (AscendingList Name)
+genAscNames n = mkAscendingList . nub <$> vectorOf n arbitrary

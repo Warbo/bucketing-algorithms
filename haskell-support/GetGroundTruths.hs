@@ -49,6 +49,67 @@ theoremDeps = map wrapSecond unwrapped
                            Just p  -> runIO (B.readFile p)
                    lift (map sortSecond (strToData s)))
 
+-- | A (rose) tree structure where nodes contain a list of TheoremIDs and each
+--   branch/subtree is labelled with a Name. The path from the root to the node
+--   containing a TheoremID is that theorem's dependency set. For example:
+--
+--       Trie [] [
+--         (n1, Trie [t1, t2] [
+--           (n2, Trie [t3] [])
+--         ]),
+--         (n2, Trie [] [
+--           (n3, Trie [t4, t5] [
+--             (n4, Trie [t6] [])
+--           ]),
+--           (n4, Trie [t7] [])
+--         ])
+--       ]
+--
+--   In this case each theorem (t1, t2, etc.) has at least one dependency, since
+--   the outermost list is empty. The paths to each theorem are the
+--   dependencies, hence:
+--
+--     t1 depends only on n1
+--     t2 also depends only on n1
+--     t3 depends on n1 and n2
+--     t4 and t5 depend on n2 and n3
+--     t6 depends on n2, n3 and n4
+--     t7 depends on n2 and n4
+--
+--   The dependencies are always in ascending order, which makes querying for
+--   supersets faster, since we can short-circuit and avoid some subtrees
+--   entirely.
+theoremDepsTrie :: Trie TheoremID Name
+theoremDepsTrie = listToTrie unwrapped  -- Convert into a Trie at runtime
+  -- We read  the data at compile time using TemplateHaskell. This was we get a
+  -- pure value to work with, and we avoid repeating some work over and over.
+  -- Note that TemplateHaskell can only build certain types of values, so we do
+  -- the final conversion step at runtime.
+  where unwrapped :: [(TheoremID, [Name])]
+        unwrapped =
+          $(let name = "BENCHMARKS_THEOREM_DEPS"
+
+                lispToData l = case L.parseEither L.parseLisp l of
+                                 Left  e -> error e
+                                 Right d -> d
+
+                strToData :: B.ByteString -> [(TheoremID, [Name])]
+                strToData  s = case AP.parseOnly (L.lisp <* AP.endOfInput) s of
+                                 Left  e -> error e
+                                 Right l -> lispToData l
+
+                sortSecond (t, deps) = (t, List.sort deps)
+
+             in do mp <- runIO (Env.lookupEnv name)
+                   s  <- case mp of
+                           Nothing -> error ("Env doesn't contain " ++ name)
+                           Just p  -> runIO (B.readFile p)
+                   lift (map sortSecond (strToData s)))
+
+-- | Look up the ground truth theorems for a given sample
+theoremFilesAdmittedTrie :: AscendingList Name -> [TheoremID]
+theoremFilesAdmittedTrie sample = trieSubsets sample theoremDepsTrie
+
 theoremFilesAdmittedBy :: AscendingList Name -> [TheoremID]
 theoremFilesAdmittedBy sample = map fst (filter match theoremDeps)
   where match td = snd td `subsetAsc` sample

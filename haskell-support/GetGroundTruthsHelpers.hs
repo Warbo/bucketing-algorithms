@@ -107,3 +107,97 @@ sampleResultToJSON r = A.object [
     "sampleNames"    A..= either A.toJSON A.toJSON (names r)
   , "sampleTheorems" A..= A.toJSON (theorems r)
   ]
+
+-- We arrange the theorem dependencies into a trie to speed up subset finding.
+-- The dependencies are sorted, then the first level of the trie contains a list
+-- for each smallest-element, e.g. [(t1, [A, B]), (t2, [B, D]), (t3, [E]),
+-- (t4, [E, F])] gives
+--
+--   +-- A ----- B --- t1
+--   |
+-- --+-- B ----- D --- t2
+--   |
+--   |       +-- t1
+--   |       |
+--   +-- E --+
+--           |
+--           +-- F --- t4
+
+data Trie a b = TrieNode [a] (AscendingList (b, Trie a b)) deriving (Eq, Show)
+
+-- | The empty Trie; useful for initialising a fold
+zTrie :: Ord b => Trie a b
+zTrie = TrieNode [] (AscendingList [])
+
+-- | Checks the invariants of the given Trie. Returns a list of errors found (an
+--   empty list means no errors). We require Show to generate specific messages.
+checkTrie :: (Ord b, Show a, Show b) => Trie a b -> [String]
+checkTrie (TrieNode _ asc) = go (unAsc asc)
+  where go []                   = []
+        go [(a, ta)]            = checkTrie ta
+        go ((a, ta):(b, tb):ys) =
+          if a < b then [] else [show a ++ " > " ++ show b] ++
+          checkTrie ta                                      ++
+          go ((b, tb):ys)
+
+addTrie :: forall a b. Ord b => a -> AscendingList b -> Trie a b -> Trie a b
+addTrie tid (AscendingList deps) (TrieNode tids (AscendingList branches)) =
+    case deps of
+      []   -> TrieNode (tid:tids) (AscendingList branches)
+      d:ds -> TrieNode      tids  (   go d ds [] branches)
+
+  where go :: Ord b => b -> [b] -> [(b, Trie a b)] -> [(b, Trie a b)]
+                    -> AscendingList (b, Trie a b)
+        go d ds acc bss = case bss of
+          []        -> let b' = addTrie tid (AscendingList ds) zTrie
+                        in AscendingList $ reverse ((d, b'):acc)
+
+          (x, b):bs -> case d `compare` x of
+                         LT -> let b' = addTrie tid (AscendingList ds) zTrie
+                                in AscendingList $
+                                     reverse ((x, b):(d, b'):acc) ++ bs
+
+                         EQ -> let b' = addTrie tid (AscendingList ds) b
+                                in AscendingList $ reverse ((x, b'):acc) ++ bs
+
+                         GT -> go d ds ((x, b):acc) bs
+
+listToTrie :: forall a b. Ord b => [(a, [b])] -> Trie a b
+listToTrie = go zTrie . map sortDeps
+  where sortDeps :: Ord b => (a, [b]) -> (a, AscendingList b)
+        sortDeps (t, deps) = (t, sortUniq deps)
+
+        go :: Trie a b -> [(a, AscendingList b)] -> Trie a b
+        go !acc []              = acc
+        go !acc ((t, deps):tds) = go (addTrie t deps acc) tds
+
+sortUniq :: forall a. Ord a => [a] -> AscendingList a
+sortUniq = AscendingList . List.foldl' insertIfMissing []
+  where insertIfMissing :: Ord a => [a] -> a -> [a]
+        insertIfMissing []     x = [x]
+        insertIfMissing (y:ys) x = case x `compare` y of
+                                     LT -> x:y:ys
+                                     EQ ->   y:ys
+                                     GT ->   y:insertIfMissing ys x
+
+theoremsToTrie :: [(TheoremID, [Name])] -> Trie TheoremID Name
+theoremsToTrie = listToTrie
+
+trieSubsets :: Ord b => AscendingList b -> Trie a b -> [a]
+trieSubsets (AscendingList deps) t = go [] t deps
+  where go !acc (TrieNode ids branches) ds = go' (ids ++ acc) (unAsc branches) ds
+
+        go' !acc []            _      = acc
+        go' !acc _             []     = acc
+        go' !acc l@((x, b):bs) (d:ds) = case d `compare` x of
+                                          -- Ignore d and try again
+                                          LT -> go' acc           l  ds
+
+                                          -- Look in b; also look for ds in bs
+                                          EQ -> go' (go acc b ds) bs ds
+
+                                          -- Skip b and look in bs
+                                          GT -> go' acc bs (d:ds)
+
+theoremsFromTrie :: AscendingList Name -> Trie TheoremID Name -> [TheoremID]
+theoremsFromTrie = trieSubsets
