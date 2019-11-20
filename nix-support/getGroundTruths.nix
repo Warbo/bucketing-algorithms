@@ -1,6 +1,6 @@
-{ attrsToDirs', bash, bucketProportions, fail, ghcWithML4HSFE, haskellPackages,
-  jq, lzip, makeSamples, mkBin, msgpack-tools, runCommand, tebenchmark,
-  withDeps, wrap, writeScript }:
+{ attrsToDirs', bash, bucketProportions, composeBins, fail, ghcWithML4HSFE,
+  haskellPackages, jq, lzip, makeSamples, mkBin, msgpack-tools, runCommand,
+  runOn, tebenchmark, withDeps, wrap, writeScript }:
 
 with rec {
   # Takes a "Main" file and compiles it, with some fixed dependencies
@@ -52,10 +52,10 @@ with rec {
   # bigger ones to exercise the code a bit more, and a more realistic size to
   # ensure profile information doesn't inflate overheads.
   testSamples = {
-    smallSample = makeSamples { sizes = [ 2      ]; reps = 1;   };
-    midSample   = makeSamples { sizes = [ 1      ]; reps = 2;   };
-    bigSample   = makeSamples { sizes = [ 1 5 10 ]; reps = 3;   };
-    heftySample = makeSamples { maxSize = 7;        reps = 100; };
+    smallSample = makeSamples { sizes = [ 2                 ]; reps = 1; };
+    midSample   = makeSamples { sizes = [ 1                 ]; reps = 2; };
+    bigSample   = makeSamples { sizes = [ 1 5  10           ]; reps = 3; };
+    heftySample = makeSamples { sizes = [ 1 50 75 87 94 100 ]; reps = 5; };
   };
 
   integrationTests = runCommand "test-get-ground-truths"
@@ -172,8 +172,12 @@ with rec {
     name    = "profiled";
     deps    = {
       inherit integrationTests;
-      inherit (bucketProportions) addBuckets;
-      samples = testSamples.heftySample;
+      samples = runOn "hefty-sample-with-buckets.lz"
+        (composeBins "add-buckets-lzip" [
+          bucketProportions.addBuckets
+          "${lzip}/bin/lzip"
+        ])
+        testSamples.heftySample;
     };
     profile = true;
     script  = ''
@@ -187,11 +191,9 @@ with rec {
       go
       go -prof -osuf p_o -fprof-auto
 
-      "$addBuckets" < "$samples" > data.json
-
       mkdir "$out"
       cd    "$out"
-      "$DIR"/Main +RTS -p < "$DIR"/data.json > /dev/null
+      "${lzip}/bin/lzip" -d < "$samples" | "$DIR"/Main +RTS -p > /dev/null
     '';
   };
 
