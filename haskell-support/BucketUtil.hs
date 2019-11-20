@@ -263,35 +263,36 @@ buf = do -- Read all stdin (lazily) into a local buffer
                         Just (c, bs') -> (bs', c)
                         Nothing       -> error "Reached EOF in getchar"
 
-        -- Like foldlUntil, but we augment the state with a counter. The given
-        -- function f chooses when to stop, optionally using its state to
-        -- decide. The final state is included in the output, but doesn't
-        -- determine the returned strings. Those are a suffix and prefix of the
-        -- given ByteString, respectively; split at the final value of the
-        -- counter. This counting and splitting should be more efficient than
-        -- building up ByteStrings one Char at a time.
+        -- The given function is folded over the given ByteString, accumulating
+        -- a state until it decides to stop. We count the number of steps taken.
+        -- The final state is included in our output, but doesn't determine the
+        -- ByteStrings we return. Those are a suffix and prefix of the given
+        -- ByteString, respectively; split using the counter we made. This
+        -- counting and splitting is more efficient than building up ByteStrings
+        -- one Char at a time.
         getuntil' :: forall state
                    . (state -> Char -> (state, Bool))
                   -> state
                   -> LBS.ByteString
                   -> (LBS.ByteString, (state, LBS.ByteString))
-        getuntil' f s bs = let go :: (Int64, state)
-                                  -> Char
-                                  -> ((Int64, state), Bool)
-                               go (!n, x) c = let (y, stop) = f x c
-                                               in ((n+1, y), stop)
+        getuntil' f initial str =
+          let -- Our loop; calls 'f' on each Char, passing along the state and
+              -- counting the number of steps taken.
+              countUntil :: Int64 -> state -> LBS.ByteString -> (Int64, state)
+              countUntil !n !s !bs = case LBS.uncons bs of
+                Nothing         -> error (show (("error", "Ran out of input" )
+                                               ,("where", "Buffered getuntil")
+                                               ,("n"    , n                  )
+                                               ))
+                Just (!c, !bs') -> case f s c of
+                  (!s', True ) -> (n+1, s')
+                  (!s', False) -> countUntil (n+1) s' bs'
 
-                            in case foldlUntil go (0, s) bs of
-                                 (n, s') -> let (pre, suf) = LBS.splitAt n bs
-                                             in (suf, (s', pre))
-
--- | Like ByteString's foldl' but short-circuits if True is returned
-foldlUntil :: (a -> Char -> (a, Bool)) -> a -> LBS.ByteString -> a
-foldlUntil f !z bs = case LBS.uncons bs of
-                       Nothing -> z
-                       Just (c, bs') -> case f z c of
-                                          (!z', True ) -> z'
-                                          (!z', False) -> foldlUntil f z' bs'
+           -- Start the loop, pass along the final state and use the counter to
+           -- split the ByteString. Effect is like calling 'getchar' 'n' times.
+           in case countUntil 0 initial str of
+                (!n, !final) -> case LBS.splitAt n str of
+                                  (!pre, !suf) -> (suf, (final, pre))
 
 bucketStdio :: Monad m
             => StreamImp m
