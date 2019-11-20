@@ -1,8 +1,10 @@
+{-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections       #-}
 module Main where
 
 import qualified BucketUtil                 as BU
+import           Control.Monad              (replicateM)
 import           Control.Monad.State.Strict (State, get, put, replicateM_,
                                              runState)
 import           Criterion                  (benchmark', env, nf)
@@ -10,7 +12,8 @@ import           Criterion.Types            (anMean, reportAnalysis)
 import qualified Data.Aeson                 as A
 import qualified Data.Aeson                 as A
 import qualified Data.ByteString.Lazy.Char8 as LB
-import           Data.Char                  (isAscii, isPrint, ord)
+import           Data.Char                  (isAscii, isDigit, isPrint, isSpace,
+                                             ord)
 import qualified Data.HashMap.Strict        as HM
 import           Data.List                  (foldl', intercalate, nub, nubBy,
                                              sort)
@@ -62,17 +65,17 @@ parseWorks  = testGroup "Can parse examples" [
                                    ss      = shrink s
                                 in map (o,) ss ++ map (,s) os
 
-              f key = do mv <- BU.parseOneChunked' BU.testImp
-                         BU.info BU.testImp (show (("key", key), ("val", mv)))
+              f key = do mv <- BU.parseOne testImp
+                         BU.info testImp (show (("key", key), ("val", mv)))
 
-              check (o, s) = case BU.runOn (`BU.streamKeyVals` f) (o ++ s) of
+              check (o, s) = case runOn (`BU.streamKeyVals` f) (o ++ s) of
                 ((), i) -> counterexample (show ("state", i)) $
-                  ("next"    , BU.next     i) === ("next"    , s        ) .&&.
-                  ("previous", BU.previous i) === ("previous", reverse o)
+                  ("next"    , next     i) === ("next"    , s        ) .&&.
+                  ("previous", previous i) === ("previous", reverse o)
 
            in forAllShrink gen shrink' check
 
-parseEquivalent = testProperty "parseOne' equivalent to parseOneChunked'" go
+parseEquivalent = testProperty "parseOne equivalent to char-at-a-time" go
   where go  = forAllShrink ((,) <$> sized genJSON  <*> arbitrary) shrink' check
 
         check :: (String, String) -> Property
@@ -85,10 +88,10 @@ parseEquivalent = testProperty "parseOne' equivalent to parseOneChunked'" go
            in ("state", ni        ) === ("state", oi        ) .&&.
               ("got"  , nmb       ) === ("got"  , omb       ) .&&.
               ("json" , nms       ) === ("json" , Just json ) .&&.
-              ("next" , BU.next ni) === ("next" , extra     )
+              ("next" , next ni) === ("next" , extra     )
 
-        old = BU.runOn BU.parseOne'
-        new = BU.runOn BU.parseOneChunked'
+        old = runOn (\imp -> BU.getchar imp >>= oldParser imp LB.empty BU.PSTop)
+        new = runOn BU.parseOne
 
         shrink' :: (String, String) -> [(String, String)]
         shrink' (json, extra) =
@@ -107,24 +110,24 @@ augmentRepArray = testFewer $ testGroup "Rep handling" [
     , testFewer $ testProperty "Check buckets"       (go checkBuckets)
     ]
 
-  where go f aa@(AA args) = let result = BU.runOn GGT.augmentRep (renderAA aa)
+  where go f aa@(AA args) = let result = runOn GGT.augmentRep (renderAA aa)
                                 -- Show final state if there's a failure
                              in counterexample (show ("result", result))
                                                (f args result)
 
-        checkPost args@(_, _, _, post) (_, x) = BU.next x === post
+        checkPost args@(_, _, _, post) (_, x) = next x === post
 
         checkOutput _ (_, x) =
-          let inner = parseOut (BU.out x)
+          let inner = parseOut (out x)
            in isJust inner
 
         checkMethods args@(methods, _, _, _) (_, x) =
-          let Just obj        = parseOut (BU.out x)
+          let Just obj        = parseOut (out x)
               (names, values) = unzip (Map.toList obj)
            in sort methods === sort names
 
         checkBuckets args (_, x) =
-          let Just obj    = parseOut (BU.out x)
+          let Just obj    = parseOut (out x)
               (_, values) = unzip (Map.toList obj)
            in conjoin (map (checkMethod args) values)
 
@@ -143,10 +146,10 @@ augmentRepArray = testFewer $ testGroup "Rep handling" [
            in conjoin (map ok (concat lst))
 
 augmentRepNull = testProperty "Can handle null reps" go
-  where go post = check post (BU.runOn GGT.augmentRep ("null" ++ post))
+  where go post = check post (runOn GGT.augmentRep ("null" ++ post))
 
-        check post (_, x) = BU.previous x === "llun" .&&.
-                            BU.next     x === post
+        check post (_, x) = previous x === "llun" .&&.
+                            next     x === post
 
 augmentSize = testFewer $
     testProperty "Can augment sizes" (forAllShrink (sized gen) shrink' check)
@@ -163,18 +166,18 @@ augmentSize = testFewer $
 
         shrinkRep r = []
 
-        check (size, post) = case BU.runOn GGT.augmentSize (size ++ post) of
+        check (size, post) = case runOn GGT.augmentSize (size ++ post) of
           ((), i) -> counterexample (show ("state", i)) $
-            ("next", BU.next i) === ("next", post)
+            ("next", next i) === ("next", post)
 
 getGroundTruths = testGroup "getGroundTruths.main'" [
       testProperty "getGroundTruths from empty" empty
     , testFewer $ testProperty "Can run getGroundTruths.main'"
                     (forAllShrink (sized gen) shrink' check)
     ]
-  where empty = case BU.runOn GGT.main' "{}" of
-          ((), s) -> BU.out  s === "{}" .&&.
-                     BU.next s === ""
+  where empty = case runOn GGT.main' "{}" of
+          ((), s) -> out  s === "{}" .&&.
+                     next s === ""
 
         gen n = do post  <- arbitrary
                    sizes <- genList genSize n
@@ -187,10 +190,10 @@ getGroundTruths = testGroup "getGroundTruths.main'" [
               os                = map (LB.unpack . A.encode) (shrinkO o)
            in map (, post) os ++ map (json,) posts
 
-        check (json, post) = case BU.runOn GGT.main' (json ++ post) of
+        check (json, post) = case runOn GGT.main' (json ++ post) of
           ((), s) -> counterexample (show ("state", s)) $
-            ("previous", BU.previous s) === ("previous", reverse json) .&&.
-            ("next"    , BU.next     s) === ("next"    , post        )
+            ("previous", previous s) === ("previous", reverse json) .&&.
+            ("next"    , next     s) === ("next"    , post        )
 
 haveDeps = testGroup "Have theorem deps to look up" [
       testProperty "Look up decoded deps" (forAllShrink genDec shrink' getDec)
@@ -287,15 +290,15 @@ findColon = testProperty "Can find colons" go
   where go :: String -> Int -> Property
         go post n = forAll (genSpace n) (canFind post)
 
-        canFind post pre = found pre post (BU.runOn GGT.findColon
+        canFind post pre = found pre post (runOn GGT.findColon
                                                     (mkStart pre post))
 
         mkStart pre post = pre ++ ":" ++ post
 
-        found pre post (_, x) = BU.previous x === (':':reverse pre) .&&.
-                                BU.next     x === post              .&&.
-                                BU.out      x === ""                .&&.
-                                BU.err      x === []
+        found pre post (_, x) = previous x === (':':reverse pre) .&&.
+                                next     x === post              .&&.
+                                out      x === ""                .&&.
+                                err      x === []
 
 subset = testGroup "Can find subsets" [
       testProperty     "Subsets are spotted" spotSubsets,
@@ -318,6 +321,86 @@ subset = testGroup "Can find subsets" [
 -- Helpers
 
 testFewer = localOption (QuickCheckTests 10)
+
+-- | Pure implementation of our I/O interface, for use in tests. We use
+--   ByteString for speed, but also provide String-based projection functions
+--   for ease of use.
+data TestImp = TestImp {
+    previous' :: LB.ByteString
+  , next'     :: LB.ByteString
+  , out'      :: LB.ByteString
+  , err       :: [String]
+  } deriving (Eq, Show)
+
+testImp :: BU.StreamImp (State TestImp)
+testImp = BU.StreamImp {
+      BU.getchar     = getchar
+    , BU.getcontents = getcontents
+    , BU.getuntil    = getuntilDefault LB.empty
+    , BU.info        = info
+    , BU.putchar     = putchar
+    , BU.putstr      = putstr
+    }
+  where getchar = do x <- get
+                     let pre      = previous' x
+                     case LB.uncons (next' x) of
+                       Nothing        -> error "Exhausted input"
+                       Just (c, rest) -> do
+                         put (x { previous' = LB.cons' c pre
+                                , next'     = rest
+                                })
+                         pure c
+
+        getcontents = do x <- get
+                         let pre  = previous' x
+                             rest = next'     x
+                         put (x { previous' = LB.append (LB.reverse rest)
+                                                         pre
+                                , next'     = LB.pack "" })
+                         pure rest
+
+        info :: String -> State TestImp ()
+        info s = do x <- get
+                    put (x { err = s : err x })
+
+        putchar :: Char -> State TestImp ()
+        putchar c = do x <- get
+                       put (x { out' = LB.snoc (out' x) c })
+
+        putstr :: LB.ByteString -> State TestImp ()
+        putstr s = do x <- get
+                      put (x { out' = LB.append (out' x) s })
+
+        -- | Default implementation of getuntil, in terms of getchar. This will
+        --   work, but building the result one Char at a time is not very fast.
+        getuntilDefault :: LB.ByteString
+                        -> (s -> Char -> (s, Bool))
+                        -> s
+                        -> State TestImp (s, LB.ByteString)
+        getuntilDefault !acc f s = do
+          c <- getchar
+          let acc' = LB.snoc acc c
+          case f s c of
+            (s', True) -> return (s', acc')
+            (s', _   ) -> getuntilDefault acc' f s'
+
+runOn :: (BU.StreamImp (State TestImp) -> State TestImp a)
+      -> String
+      -> (a, TestImp)
+runOn f s = runState (f testImp) (startState s)
+  where startState s = TestImp {
+            previous' = LB.pack ""
+          , next'     = LB.pack s
+          , out'      = LB.pack ""
+          , err       = []
+          }
+
+-- String-based projection functions
+previous = LB.unpack . previous'
+next     = LB.unpack . next'
+out      = LB.unpack . out'
+
+--
 
 type Dep         = String
 type Method      = String
@@ -472,6 +555,99 @@ parseOut s = do
         parseOut' = A.decode . LB.pack
 
         jsonToString (A.String s) = T.unpack s
+
+-- | An old implementation of our streaming JSON parser, which works one Char at
+--   a time rather than chunking with 'getuntil'. Useful for benchmarking and
+--   testing against the new implementation.
+oldParser :: Monad m
+          => BU.StreamImp m
+          -> LB.ByteString
+          -> BU.ParseState
+          -> Char
+          -> m (Maybe LB.ByteString)
+oldParser imp !bs s c = case (s, c) of
+    -- Pop the state when we see our closing delimiter; return if finished
+    (BU.PSInside BU.CObject BU.PSTop, '}') -> snocTo   bs '}'
+    (BU.PSInside BU.CObject s'      , '}') -> readSnoc bs '}' s'
+    (BU.PSInside BU.CArray  BU.PSTop, ']') -> snocTo   bs ']'
+    (BU.PSInside BU.CArray  s'      , ']') -> readSnoc bs ']' s'
+    (BU.PSInside BU.CString BU.PSTop, '"') -> snocTo   bs '"'
+    (BU.PSInside BU.CString s'      , '"') -> readSnoc bs '"' s'
+
+    -- Fail if we've hit the end of a container we're not in
+    (BU.PSTop, '}') -> pure Nothing
+    (BU.PSTop, ']') -> pure Nothing
+
+    -- Special case to handle escaped quotes and escaped escapes
+    (BU.PSInside BU.CString s', '\\') -> do c'  <- BU.getchar imp
+                                            c'' <- BU.getchar imp
+                                            oldParser
+                                              imp
+                                              (LB.snoc (LB.snoc bs c) c')
+                                              s
+                                              c''
+
+    -- Skip everything else if we're in a string
+    (BU.PSInside BU.CString _, _) -> BU.getchar imp >>=
+                                     oldParser imp (LB.snoc bs c) s
+
+    -- Always skip whitespace
+    _ | isSpace c -> BU.getchar imp >>= oldParser imp (LB.snoc bs c) s
+
+    -- Skip over ':' and ',' as if they're whitespace
+    (_, ':') -> readSnoc bs c s
+    (_, ',') -> readSnoc bs c s
+
+    -- Accept keywords as values
+    (BU.PSTop, 'n') -> do "ull"  <- replicateM 3 (BU.getchar imp)
+                          pure $! Just $ foldl' LB.snoc
+                                                bs
+                                                ("null" :: String)
+
+    (BU.PSTop, 't') -> do "rue"  <- replicateM 3 (BU.getchar imp)
+                          pure $! Just $ foldl' LB.snoc
+                                                bs
+                                                ("true" :: String)
+
+    (BU.PSTop, 'f') -> do "alse" <- replicateM 4 (BU.getchar imp)
+                          pure $! Just $ foldl' LB.snoc
+                                                bs
+                                                ("false" :: String)
+
+    -- Skip over keywords when they're in a container
+    (_, 'n') -> do "ull"  <- replicateM 3 (BU.getchar imp)
+                   c' <- BU.getchar imp
+                   oldParser imp
+                             (foldl' LB.snoc bs ("null" :: String))
+                             s
+                             c'
+
+    (_, 't') -> do "rue"  <- replicateM 3 (BU.getchar imp)
+                   c' <- BU.getchar imp
+                   oldParser imp
+                             (foldl' LB.snoc bs ("true" :: String))
+                             s
+                             c'
+
+    (_, 'f') -> do "alse" <- replicateM 4 (BU.getchar imp)
+                   c' <- BU.getchar imp
+                   oldParser imp
+                             (foldl' LB.snoc bs ("false" :: String))
+                             s
+                             c'
+
+    -- Skip over numbers
+    _ | isDigit c -> readSnoc bs c s
+
+    -- Match an opening delimiter
+    (_, '{') -> readSnoc bs '{' (BU.PSInside BU.CObject s)
+    (_, '[') -> readSnoc bs '[' (BU.PSInside BU.CArray  s)
+    (_, '"') -> readSnoc bs '"' (BU.PSInside BU.CString s)
+
+  where snocTo   bs c   = pure $! (Just $! LB.snoc bs c)
+
+        readSnoc bs c s = BU.getchar imp >>= oldParser imp (LB.snoc bs c) s
+
 
 genSpace :: Int -> Gen String
 genSpace 0          = pure ""

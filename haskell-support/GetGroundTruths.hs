@@ -104,7 +104,7 @@ augmentRep imp = do c <- BU.skipSpace imp
 
 goArray :: Monad m => BU.StreamImp m -> m ()
 goArray imp = do -- First entry is {"sampleNames":[...]}
-                 Just sampleStr <- BU.parseOneChunked' imp
+                 Just sampleStr <- BU.parseOne imp
                  let Just obj    = A.decode sampleStr
                      Just !names = H.lookup "sampleNames"
                                      (obj :: H.HashMap String [Name])
@@ -119,7 +119,7 @@ goArray imp = do -- First entry is {"sampleNames":[...]}
                  putchar imp ']'
 
   where go first = do
-          mk <- BU.parseOneChunked' imp
+          mk <- BU.parseOne imp
           case mk of
             Nothing -> do putchar imp '}' -- We've hit, and consumed, the '}'
             Just !k -> do let key = BU.trimKey k
@@ -144,7 +144,7 @@ augmentRun :: Monad m => BU.StreamImp m -> LB.ByteString -> m ()
 augmentRun imp key = do putstr imp key
                         putstr imp " : "
                         findColon imp
-                        Just str <- BU.parseOneChunked' imp
+                        Just str <- BU.parseOne imp
                         putstr imp (A.encode (mkResult str))
 
 main' imp = BU.streamKeyVals imp go
