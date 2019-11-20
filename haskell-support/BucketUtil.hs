@@ -277,6 +277,7 @@ buf = do -- Read all stdin (lazily) into a local buffer
 type Args = ([Name] -> [AST], [Bucketer])
 
 bucketStdio :: forall m
+             . Monad m
             => StreamImp m
             -> [Bucketer]
             -> ([TL.Text] -> [TL.Text])
