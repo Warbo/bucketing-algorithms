@@ -3,19 +3,23 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE RankNTypes            #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TupleSections         #-}
 module BucketUtil where
 
 import           Control.Applicative        ((<|>))
-import           Control.DeepSeq            (($!!), deepseq, force, NFData, rnf)
+import           Control.DeepSeq            (NFData, deepseq, force, rnf, ($!!))
 import           Control.Monad              (mzero, replicateM)
-import           Control.Monad.State.Strict (get, put, replicateM_, runState, State)
+import           Control.Monad.State.Strict (State, get, put, replicateM_,
+                                             runState)
 import qualified Data.Aeson                 as A
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import qualified Data.Char                  as C
 import qualified Data.HashMap.Strict        as HM
 import qualified Data.Interned              as I
 import qualified Data.Interned.Text         as IT
+import           Data.IORef
 import qualified Data.List                  as L
 import qualified Data.Map.Strict            as Map
 import           Data.Maybe                 (fromJust)
@@ -25,6 +29,7 @@ import qualified Data.Text.Lazy             as TL
 import qualified Data.Text.Lazy.Encoding    as TE
 import           Debug.Trace                (trace)
 import           GHC.Generics               (Generic)
+import           GHC.Int                    (Int64)
 import qualified HS2AST.Types               as HT
 import           System.Environment         (lookupEnv)
 import           System.IO                  (hPutStrLn, stderr)
@@ -162,10 +167,23 @@ astToId x = HT.ID { HT.idPackage = p, HT.idModule = m , HT.idName = n }
 -- This type lets us avoid hard-coding IO, so that we can test some functions
 -- more easily
 data StreamImp m = StreamImp {
+  -- Consume and return a single Char from the input
     getchar     ::                   m Char
+
+  -- Consume and return the entire input
   , getcontents ::                   m LBS.ByteString
+
+  -- Consume Chars until the given condition is False. Allowing state s makes
+  -- context-free parsing easier. Returns what we consumed and the final state.
+  , getuntil :: forall s. (s -> Char -> (s, Bool)) -> s -> m (s, LBS.ByteString)
+
+  -- Log debugging info
   , info        ::         String -> m ()
+
+  -- Write a Char to the output
   , putchar     ::           Char -> m ()
+
+  -- Write a whole string to the output
   , putstr      :: LBS.ByteString -> m ()
   }
 
@@ -175,39 +193,137 @@ debug msg = do shouldDebug <- lookupEnv "DEBUG"
                  Just "1" -> hPutStrLn stderr msg
                  _        -> pure ()
 
+-- | Default implementation of getuntil, in terms of getchar. This will work,
+--   but building the result one Char at a time is not very fast.
+getuntilDefault :: Monad m
+                => StreamImp m
+                -> (s -> Char -> (s, Bool))
+                -> s
+                -> m (s, LBS.ByteString)
+getuntilDefault imp = go LBS.empty
+    where go !acc f s = do c <- getchar imp
+                           let acc' = LBS.snoc acc c
+                           case f s c of
+                             (s', True) -> return (s', acc')
+                             (s', _   ) -> go acc' f s'
+
 -- Specialises StreamImp to IO
 io = StreamImp {
-    getchar     = getChar
-  , getcontents = LBS.getContents
-  , info        = debug
-  , putchar     = putChar
-  , putstr      = LBS.putStr
-  }
+      getchar     = getChar
+    , getcontents = LBS.getContents
+    , getuntil    = getuntilDefault io
+    , info        = LBS.hPut stderr . LBS.pack
+    , putchar     = putChar
+    , putstr      = LBS.putStr
+    }
 
-bucketStdio :: [Bucketer] -> ([TL.Text] -> [TL.Text]) -> IO ()
-bucketStdio brs f = processSizes (astsOf f, brs)
+newtype BufferedIO a = BIO { runBIO :: IO a }
+
+instance Functor BufferedIO where
+  fmap f (BIO x) = BIO (fmap f x)
+
+instance Applicative BufferedIO where
+  pure x = BIO (pure x)
+  (BIO f) <*> (BIO x) = BIO (f <*> x)
+
+instance Monad BufferedIO where
+  return        = pure
+  (BIO x) >>= f = BIO (x >>= (runBIO . f))
+
+-- | Buffered IO implementation of our streaming interface. In particular, this
+--   version reads the whole of stdin into a buffer, then acts on this buffer
+--   from then on. Using a lazy bytestring for our buffer ensures it will be
+--   read on-demand, in reasonably-sized chunks rather than all at once or one
+--   character at a time.
+--
+--  Note that we must only create one implementation and pass it around. If we
+--  try using two it will cause 'getContents' to be called twice, which will
+--  complain that stdin has been closed (by the first call). That's why there's
+--  an 'IO' wrapper around this.
+buf :: IO (StreamImp BufferedIO)
+buf = do -- Read all stdin (lazily) into a local buffer
+         b <- LBS.getContents >>= newIORef
+         pure $ StreamImp {
+             getchar     = apply b getchar'
+           , getcontents = apply b (\s -> (LBS.empty, s))
+           , getuntil    = \f s -> apply b (getuntil' f s)
+
+           -- The following don't use stdin, so we can defer to io
+           , info        = BIO . info io
+           , putchar     = BIO . putchar io
+           , putstr      = BIO . putstr io
+           }
+  where -- Update the buffer (strictly) and return a value
+        apply :: IORef LBS.ByteString
+              -> (LBS.ByteString -> (LBS.ByteString, a))
+              -> BufferedIO a
+        apply b f = BIO $ atomicModifyIORef' b f
+
+        getchar' bs = case LBS.uncons bs of
+                        Just (c, bs') -> (bs', c)
+                        Nothing       -> error "Reached EOF in getchar"
+
+        -- Like foldlUntil, but we augment the state with a counter. The given
+        -- function f chooses when to stop, optionally using its state to
+        -- decide. The final state is included in the output, but doesn't
+        -- determine the returned strings. Those are a suffix and prefix of the
+        -- given ByteString, respectively; split at the final value of the
+        -- counter. This counting and splitting should be more efficient than
+        -- building up ByteStrings one Char at a time.
+        getuntil' :: forall state
+                   . (state -> Char -> (state, Bool))
+                  -> state
+                  -> LBS.ByteString
+                  -> (LBS.ByteString, (state, LBS.ByteString))
+        getuntil' f s bs = let go :: (Int64, state)
+                                  -> Char
+                                  -> ((Int64, state), Bool)
+                               go (!n, x) c = let (y, stop) = f x c
+                                               in ((n+1, y), stop)
+
+                            in case foldlUntil go (0, s) bs of
+                                 (n, s') -> let (pre, suf) = LBS.splitAt n bs
+                                             in (suf, (s', pre))
+
+-- | Like ByteString's foldl' but short-circuits if True is returned
+foldlUntil :: (a -> Char -> (a, Bool)) -> a -> LBS.ByteString -> a
+foldlUntil f !z bs = case LBS.uncons bs of
+                       Nothing -> z
+                       Just (c, bs') -> case f z c of
+                                          (!z', True ) -> z'
+                                          (!z', False) -> foldlUntil f z' bs'
+
+bucketStdio :: Monad m
+            => StreamImp m
+            -> [Bucketer]
+            -> ([TL.Text] -> [TL.Text])
+            -> m ()
+bucketStdio imp brs f = processSizes imp (astsOf f, brs)
 
 -- We read in JSON and write out JSON with the same structure, plus some extras.
 -- It's wasteful to accumulate this in memory, so instead we process one rep at
 -- a time.
 
-putErr = LBS.hPut stderr
+processSizes imp opts      =  streamKeyVals imp (processSize imp opts)
 
-processSizes opts      =  streamKeyVals (processSize opts)
-
-processSize  opts size = do LBS.putStr (LBS.filter (/= ',') size)
-                            putChar ':'
-                            processKeyVals (processRep' opts size)
+processSize  imp opts size = do putstr imp (LBS.filter (/= ',') size)
+                                putchar imp ':'
+                                processKeyVals imp (processRep imp opts size)
 
 type Args = ([Name] -> [AST], [Bucketer])
 
-processRep' :: Args -> LBS.ByteString -> LBS.ByteString -> LBS.ByteString
-            -> IO ()
-processRep' (astsOf, bucketers) size !key !bs =
-    do putErr (LBS.concat ["Size ", size, " rep ", key, "\n"])
-       LBS.putStr key
-       LBS.putStr ": "
-       LBS.putStr go
+processRep :: Monad m
+           => StreamImp m
+           -> Args
+           -> LBS.ByteString
+           -> LBS.ByteString
+           -> LBS.ByteString
+           -> m ()
+processRep imp (astsOf, bucketers) size !key !bs = do
+    mapM_ (info imp) ["Size ", LBS.unpack size, " rep ", LBS.unpack key, "\n"]
+    putstr imp key
+    putstr imp ": "
+    putstr imp go
   where go = case A.eitherDecode bs' of
                Left _ -> case A.eitherDecode bs' of
                            Right A.Null -> A.encode A.Null
@@ -234,53 +350,52 @@ processRep' (astsOf, bucketers) size !key !bs =
         notStart 'N' = False
         notStart _   = True
 
--- Return the next non-space Char from stdin; treat : and , as whitespace
-skipSpace = skipSpace' io
-
-skipSpace' imp = do c <- getchar imp
-                    if C.isSpace c || c `elem` (":," :: String)
-                       then skipSpace' imp
-                       else pure c
+-- | Return the next non-space Char from stdin; treat : and , as whitespace
+skipSpace imp = do c <- getchar imp
+                   if C.isSpace c || c `elem` (":," :: String)
+                      then skipSpace imp
+                      else pure c
 
 trimKey = LBS.reverse . go . LBS.reverse . go
   where go = LBS.dropWhile (/= '"')
 
 -- Reads a '{' delimiter, then loops: reads a key and value from stdin, calls f
 -- on them, then repeats; stops once the corresponding '}' gets read.
-processKeyVals :: (LBS.ByteString -> LBS.ByteString -> IO ()) -> IO ()
-processKeyVals f = do c <- skipSpace
-                      case c of
-                        '{' -> putChar '{' >> go True
-                        _   -> error (show (("Expected", '{'), ("Got", c)))
-  where go first = do mk <- parseOne
+processKeyVals :: Monad m
+               => StreamImp m
+               -> (LBS.ByteString -> LBS.ByteString -> m ())
+               -> m ()
+processKeyVals imp f = do c <- skipSpace imp
+                          case c of
+                            '{' -> putchar imp '{' >> go True
+                            _   -> error (show (("Expected", '{'), ("Got", c)))
+  where go first = do mk <- parseOneChunked' imp
                       case mk of
-                        Nothing -> putChar '}' -- We've hit, and consumed, the '}'
-                        Just !k -> do mv <- parseOne
+                        Nothing -> putchar imp '}' -- Found and consumed the '}'
+                        Just !k -> do mv <- parseOneChunked' imp
                                       case mv of
-                                        Nothing -> error (show (("Error",
-                                                                 "Key missing value"),
-                                                                ("Key", k)))
+                                        Nothing -> error
+                                          (show (("Error", "Key missing value")
+                                                ,("Key"  , k)
+                                                ))
                                         Just !v -> do if first
                                                          then pure ()
-                                                         else putChar ','
+                                                         else putchar imp ','
                                                       f (trimKey k) v
                                                       go False
 
 -- Reads a '{' delimiter, then loops: reads a key from stdin, calls f with that
 -- key, then repeats (f is responsible for reading the value); stops once the
 -- corresponding '}' gets read.
-streamKeyVals :: (LBS.ByteString -> IO ()) -> IO ()
-streamKeyVals f = streamKeyVals' io f
-
-streamKeyVals' :: Monad m => StreamImp m -> (LBS.ByteString -> m ()) -> m ()
-streamKeyVals' imp f = do c <- skipSpace' imp
-                          case c of
-                            '{' -> putchar imp '{' >> go True
-                            _   -> do rest <- getcontents imp
-                                      error (show (("Wanted", '{'             ),
-                                                   ("Got"   , c               ),
-                                                   ("Rest"  , LBS.take 50 rest)))
-  where go first = do mk <- parseOne' imp
+streamKeyVals :: Monad m => StreamImp m -> (LBS.ByteString -> m ()) -> m ()
+streamKeyVals imp f = do c <- skipSpace imp
+                         case c of
+                           '{' -> putchar imp '{' >> go True
+                           _   -> do rest <- getcontents imp
+                                     error (show (("Wanted", '{'             ),
+                                                  ("Got"   , c               ),
+                                                  ("Rest"  , LBS.take 50 rest)))
+  where go first = do mk <- parseOneChunked' imp
                       case mk of
                         Nothing -> putchar imp '}' -- We've hit, and consumed, the '}'
                         Just !k -> do if first
@@ -294,12 +409,13 @@ streamKeyVals' imp f = do c <- skipSpace' imp
 -- delimiter; this lets us consume container contents by running parseOne over
 -- and over until we get Nothing.
 
-data Container = CObject | CArray | CString
+data Container = CObject | CArray | CString | CEscaped | CKeyword Int
+  deriving (Show)
 
-data ParseState = PSTop | PSInside !Container !ParseState
+data ParseState = PSTop | PSInside !Container !ParseState deriving (Show)
 
 parseOne :: IO (Maybe LBS.ByteString)
-parseOne = parseOne' io
+parseOne = parseOneChunked' io
 
 parseOne' :: Monad m => StreamImp m -> m (Maybe LBS.ByteString)
 parseOne' imp = getchar imp >>= go LBS.empty PSTop
@@ -335,63 +451,165 @@ parseOne' imp = getchar imp >>= go LBS.empty PSTop
           (_, ':') -> readSnoc bs c s
           (_, ',') -> readSnoc bs c s
 
-          -- Accept null as a value
-          (_, 'n') -> do ['u', 'l', 'l'] <- replicateM 3 (getchar imp)
-                         pure $! (Just $! L.foldl' LBS.snoc bs
-                                                   ("null" :: String))
+          -- Accept keywords as values
+          (PSTop, 'n') -> do "ull"  <- replicateM 3 (getchar imp)
+                             pure $! Just $ L.foldl' LBS.snoc
+                                                     bs
+                                                     ("null" :: String)
+
+          (PSTop, 't') -> do "rue"  <- replicateM 3 (getchar imp)
+                             pure $! Just $ L.foldl' LBS.snoc
+                                                     bs
+                                                     ("true" :: String)
+
+          (PSTop, 'f') -> do "alse" <- replicateM 4 (getchar imp)
+                             pure $! Just $ L.foldl' LBS.snoc
+                                                     bs
+                                                     ("false" :: String)
+
+          -- Skip over keywords when they're in a container
+          (_, 'n') -> do "ull"  <- replicateM 3 (getchar imp)
+                         getchar imp >>= go (L.foldl' LBS.snoc
+                                                      bs
+                                                      ("null" :: String))
+                                            s
+
+          (_, 't') -> do "rue"  <- replicateM 3 (getchar imp)
+                         getchar imp >>= go (L.foldl' LBS.snoc
+                                                      bs
+                                                      ("true" :: String))
+                                            s
+
+          (_, 'f') -> do "alse" <- replicateM 4 (getchar imp)
+                         getchar imp >>= go (L.foldl' LBS.snoc
+                                                      bs
+                                                      ("false" :: String))
+                                            s
 
           -- Skip over numbers
           _ | C.isDigit c -> readSnoc bs c s
-
-          -- Skip over true
-          (_, 't') -> do cs <- replicateM 3 (getchar imp)
-                         getchar imp >>= go (L.foldl' LBS.snoc bs cs) s
-
-          -- Skip over false
-          (_, 'f') -> do cs <- replicateM 4 (getchar imp)
-                         getchar imp >>= go (L.foldl' LBS.snoc bs cs) s
 
           -- Match an opening delimiter
           (_, '{') -> readSnoc bs '{' (PSInside CObject s)
           (_, '[') -> readSnoc bs '[' (PSInside CArray  s)
           (_, '"') -> readSnoc bs '"' (PSInside CString s)
 
+parseOneChunked' :: Monad m => StreamImp m -> m (Maybe LBS.ByteString)
+parseOneChunked' imp = do result <- getuntil imp go (Just PSTop)
+                          return $ case result of
+                            (Nothing, _) -> Nothing
+                            (Just _ , s) -> Just s
+  where err = (Nothing, True)  -- Short hand for stopping with an error
+
+        -- We assume the state is Just, since we stop when switching to Nothing
+        go :: Maybe ParseState -> Char -> (Maybe ParseState, Bool)
+        go (Just s) c = case (s, c) of
+          -- Pop the state when we see our closing delimiter; return if finished
+          (PSInside CObject PSTop, '}') -> (Just undefined, True )
+          (PSInside CObject s'   , '}') -> (Just s'       , False)
+          (PSInside CArray  PSTop, ']') -> (Just undefined, True )
+          (PSInside CArray  s'   , ']') -> (Just s'       , False)
+          (PSInside CString PSTop, '"') -> (Just undefined, True )
+          (PSInside CString s'   , '"') -> (Just s'       , False)
+
+          -- Fail if we've hit the end of a container we're not in
+          (PSTop, '}') -> (Nothing, True)
+          (PSTop, ']') -> (Nothing, True)
+
+          -- If we hit \ in a string, switch to the escaped state
+          (PSInside CString _, '\\') -> (Just (PSInside CEscaped s), False)
+
+          -- Skip everything else if we're in a string
+          (PSInside CString _, _) -> (Just s, False)
+
+          -- Escape quotes and backslashes in strings
+          (PSInside CEscaped s'@(PSInside CString _), '"' ) -> (Just s', False)
+          (PSInside CEscaped s'@(PSInside CString _), '\\') -> (Just s', False)
+
+          -- Don't escape anything else
+          (PSInside CEscaped (PSInside CString _), _) -> err
+          (PSInside CEscaped _                   , _) -> err
+
+          -- Always skip whitespace
+          _ | C.isSpace c -> (Just s, False)
+
+          -- Skip over ':' and ',' as if they're whitespace
+          (_, ':') -> (Just s, False)
+          (_, ',') -> (Just s, False)
+
+          -- Pop the state when we reach the end of a keyword
+          (PSInside (CKeyword 0) PSTop, _) -> (Just undefined, True )
+          (PSInside (CKeyword 0) s'   , _) -> (Just s'       , False)
+
+          -- Step through a keyword if we've not reached its end yet
+          (PSInside (CKeyword n) s', c) -> (Just $ PSInside (CKeyword (n-1)) s',
+                                            False)
+
+          -- Prepare to step through null, true and false
+          (_, 'n') -> (Just $ PSInside (CKeyword 2) s, False)
+          (_, 't') -> (Just $ PSInside (CKeyword 2) s, False)
+          (_, 'f') -> (Just $ PSInside (CKeyword 3) s, False)
+
+          -- Skip over numbers
+          _ | C.isDigit c -> (Just s, False)
+
+          -- Match an opening delimiter
+          (_, '{') -> (Just $ PSInside CObject s, False)
+          (_, '[') -> (Just $ PSInside CArray  s, False)
+          (_, '"') -> (Just $ PSInside CString s, False)
+
+          _ -> error (show (("error", "Unexpected Char for state")
+                           ,("char" , c)
+                           ,("state", s)
+                           ))
+
 -- Testing support
 
 data TestImp = TestImp {
-    previous :: String
-  , next     :: String
-  , out      :: String
-  , err      :: [String]
-  } deriving (Show)
+    previous' :: LBS.ByteString
+  , next'     :: LBS.ByteString
+  , out'      :: LBS.ByteString
+  , err       :: [String]
+  } deriving (Eq, Show)
+
+-- String-based projection functions
+previous = LBS.unpack . previous'
+next     = LBS.unpack . next'
+out      = LBS.unpack . out'
 
 startState s = TestImp {
-    previous = ""
-  , next     = s
-  , out      = ""
-  , err      = []
+    previous' = LBS.pack ""
+  , next'     = LBS.pack s
+  , out'      = LBS.pack ""
+  , err       = []
   }
 
 testImp :: StreamImp (State TestImp)
 testImp = StreamImp {
       getchar     = getchar
     , getcontents = getcontents
+    , getuntil    = getuntilDefault testImp
     , info        = info
     , putchar     = putchar
     , putstr      = putstr
     }
   where getchar = do x <- get
-                     let pre      = previous x
-                     case next x of
-                       ""     -> error "Exhausted input"
-                       c:rest -> do put (x { previous = c:pre, next = rest })
-                                    pure c
+                     let pre      = previous' x
+                     case LBS.uncons (next' x) of
+                       Nothing        -> error "Exhausted input"
+                       Just (c, rest) -> do
+                         put (x { previous' = LBS.cons' c pre
+                                , next'     = rest
+                                })
+                         pure c
 
         getcontents = do x <- get
-                         let pre  = previous x
-                             rest = next     x
-                         put (x { previous = reverse rest ++ pre, next = "" })
-                         pure (LBS.pack rest)
+                         let pre  = previous' x
+                             rest = next'     x
+                         put (x { previous' = LBS.append (LBS.reverse rest)
+                                                         pre
+                                , next'     = LBS.pack "" })
+                         pure rest
 
         info :: String -> State TestImp ()
         info s = do x <- get
@@ -399,8 +617,13 @@ testImp = StreamImp {
 
         putchar :: Char -> State TestImp ()
         putchar c = do x <- get
-                       put (x { out = c : out x })
+                       put (x { out' = LBS.snoc (out' x) c })
 
-        putstr = mapM_ putchar . LBS.unpack
+        putstr :: LBS.ByteString -> State TestImp ()
+        putstr s = do x <- get
+                      put (x { out' = LBS.append (out' x) s })
 
+runOn :: (StreamImp (State TestImp) -> State TestImp a)
+      -> String
+      -> (a, TestImp)
 runOn f s = runState (f testImp) (startState s)

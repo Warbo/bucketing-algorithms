@@ -1,20 +1,22 @@
-{-# LANGUAGE BangPatterns, OverloadedStrings, TemplateHaskell #-}
+{-# LANGUAGE BangPatterns      #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
 module GetGroundTruths where
 
-import           Helper
-import           Control.Monad              (mzero)
-import qualified BucketUtil                 as BU
 import           BucketUtil                 (getchar, info, putchar, putstr)
+import qualified BucketUtil                 as BU
+import           Control.Monad              (mzero)
 import qualified Data.Aeson                 as A
 import qualified Data.AttoLisp              as L
 import qualified Data.Attoparsec.ByteString as AP
 import qualified Data.ByteString.Char8      as B
-import qualified Data.ByteString.Lazy       as LB
+import qualified Data.ByteString.Lazy.Char8 as LB
 import qualified Data.Char                  as C
 import qualified Data.HashMap.Strict        as H
 import qualified Data.List                  as List
 import qualified Data.Maybe                 as M
 import qualified Data.Text                  as T
+import           Helper
 import           Language.Haskell.TH.Syntax (lift, runIO)
 import qualified Numeric                    as N
 import qualified System.Environment         as Env
@@ -71,66 +73,54 @@ mkResult' ns = R { names = ns, theorems = either process nested ns }
         nested nns = nub (concatMap process nns)
 
 augmentSize :: Monad m => BU.StreamImp m -> m ()
-augmentSize imp = BU.streamKeyVals' imp go
-  where go key = do info imp ("Found rep " ++ show key)
-                    putstr imp key
+augmentSize imp = BU.streamKeyVals imp go
+  where go key = do putstr imp key
                     putstr imp " : "
                     augmentRep imp
 
 -- We can't use streamKeyVals here, since reps may be null
 augmentRep :: Monad m => BU.StreamImp m -> m ()
-augmentRep imp = do c <- BU.skipSpace' imp
+augmentRep imp = do c <- BU.skipSpace imp
                     case c of
-                      '[' -> do info imp "Rep is an array"
-                                putchar imp '['
+                      '[' -> do putchar imp '['
                                 goArray imp
                       'n' -> do 'u' <- getchar imp
                                 'l' <- getchar imp
                                 'l' <- getchar imp
-                                info imp "Rep is null"
                                 putstr imp "null"
                       _   -> error (show (("Wanted", "'[' or 'null'"),
                                           ("Got",    c)))
 
 goArray :: Monad m => BU.StreamImp m -> m ()
 goArray imp = do -- First entry is {"sampleNames":[...]}
-                 Just sampleStr <- BU.parseOne' imp
-                 info imp ("First array elem is " ++ show sampleStr)
+                 Just sampleStr <- BU.parseOneChunked' imp
                  let Just obj    = A.decode sampleStr
                      Just !names = H.lookup "sampleNames"
                                      (obj :: H.HashMap String [Name])
-                 info imp ("Array elem contains names " ++ show names)
                  putstr imp (A.encode (sampleResult names))
                  putchar imp ','
 
                  -- Second entry is {"method1":{...}, ...}
-                 info imp "Looking for second elem (an object)"
-                 '{' <- BU.skipSpace' imp
+                 '{' <- BU.skipSpace imp
                  putchar imp '{'
                  go True
-                 info imp "Closing off array"
-                 ']' <- BU.skipSpace' imp
+                 ']' <- BU.skipSpace imp
                  putchar imp ']'
 
-  where go first = do info imp ("Looking for " ++ (if first
-                                                      then "first"
-                                                      else "next") ++ " key")
-                      mk <- BU.parseOne' imp
-                      case mk of
-                        Nothing -> do info imp "No key found, closing off object"
-                                      putchar imp '}' -- We've hit, and consumed, the '}'
-                        Just !k -> do let key = BU.trimKey k
-                                      info imp ("Found key " ++ show k)
-                                      if first
-                                         then pure ()
-                                         else putchar imp ','
-                                      f key
-                                      go False
+  where go first = do
+          mk <- BU.parseOneChunked' imp
+          case mk of
+            Nothing -> do putchar imp '}' -- We've hit, and consumed, the '}'
+            Just !k -> do let key = BU.trimKey k
+                          if first
+                             then pure ()
+                             else putchar imp ','
+                          f key
+                          go False
 
         f key = do putstr imp key
                    putstr imp " : "
-                   info imp ("Processing " ++ show key ++ " as an object")
-                   BU.streamKeyVals' imp (augmentRun imp)
+                   BU.streamKeyVals imp (augmentRun imp)
 
 findColon :: Monad m => BU.StreamImp m -> m ()
 findColon imp = do c <- getchar imp
@@ -140,18 +130,18 @@ findColon imp = do c <- getchar imp
                      _ -> error ("Looking for ':' found " ++ show c)
 
 augmentRun :: Monad m => BU.StreamImp m -> LB.ByteString -> m ()
-augmentRun imp key = do info imp ("Found run " ++ show key)
-                        putstr imp key
+augmentRun imp key = do putstr imp key
                         putstr imp " : "
                         findColon imp
-                        Just str <- BU.parseOne' imp
-                        info imp ("Value is " ++ show str)
+                        Just str <- BU.parseOneChunked' imp
                         putstr imp (A.encode (mkResult str))
 
-main' imp = BU.streamKeyVals' imp go
-  where go !key = do info imp ("Found size " ++ show key)
+main' imp = BU.streamKeyVals imp go
+  where go !key = do mapM_ (info imp) ["Found size ", LB.unpack key, "\n"]
                      putstr imp key
                      putstr imp " : "
                      augmentSize imp
 
-mainIO = main' BU.io
+-- | Read stdin into a lazy buffer then stream from it
+mainIO = do imp <- BU.buf
+            BU.runBIO (main' imp)

@@ -1,16 +1,19 @@
-{-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections       #-}
 module Main where
 
 import qualified BucketUtil                 as BU
-import           Control.Monad.State.Strict (get, put, replicateM_, runState, State)
+import           Control.Monad.State.Strict (State, get, put, replicateM_,
+                                             runState)
 import           Criterion                  (benchmark', env, nf)
 import           Criterion.Types            (anMean, reportAnalysis)
+import qualified Data.Aeson                 as A
 import qualified Data.Aeson                 as A
 import qualified Data.ByteString.Lazy.Char8 as LB
 import           Data.Char                  (isAscii, isPrint, ord)
 import qualified Data.HashMap.Strict        as HM
-import           Data.List                  (foldl', nub, nubBy, sort)
+import           Data.List                  (foldl', intercalate, nub, nubBy,
+                                             sort)
 import qualified Data.Map.Strict            as Map
 import           Data.Maybe                 (isJust)
 import qualified Data.Text                  as T
@@ -18,55 +21,108 @@ import qualified Data.Vector                as V
 import           Debug.Trace                (traceShow)
 import qualified GetGroundTruths            as GGT
 import           GHC.IO.Encoding            (setLocaleEncoding, utf8)
+import           Helper                     (AscendingList (..), Name (..),
+                                             mkAscendingList, sortUniq)
 import qualified Helper
-import           Helper                     ( AscendingList(..)
-                                            , mkAscendingList
-                                            , Name(..)
-                                            , sortUniq
-                                            )
 import           Numeric                    (showHex)
 import           Numeric.Natural
 import           Statistics.Types           (estPoint)
 import           Test.QuickCheck
-import           Test.Tasty                 (defaultMain, localOption, testGroup)
-import           Test.Tasty.QuickCheck      (QuickCheckTests(..), testProperty)
+import           Test.Tasty                 (defaultMain, localOption,
+                                             testGroup)
+import           Test.Tasty.QuickCheck      (QuickCheckTests (..), testProperty)
 
 main = do
   setLocaleEncoding utf8
   defaultMain $ testGroup "All tests" [
-      augmentArray
-    , augmentNull
+      augmentRepArray
+    , augmentRepNull
+    , augmentSize
     , benchmarks
     , canSortUniq
     , findColon
+    , getGroundTruths
+    , parseEquivalent
+    , parseWorks
     , subset
     ]
 
-augmentArray = localOption (QuickCheckTests 3) $ testGroup "Rep handling" [
-      testProperty "Read whole array"    (go checkPost   )
-    , testProperty "Output is parseable" (go checkOutput )
-    , testProperty "Have right methods"  (go checkMethods)
-    , testProperty "Check buckets"       (go checkBuckets)
+parseWorks  = testGroup "Can parse examples" [
+      testProperty "Can stream objects" checkObject
+    ]
+  where checkObject =
+          let gen = (,) <$> sized genObj <*> arbitrary
+
+              shrink' :: (String, String) -> [(String, String)]
+              shrink' (o, s) = let Just o' = A.decode (LB.pack o)
+                                   oToS    = LB.unpack . A.encode . A.Object
+                                   os      = map oToS (shrinkO o')
+                                   ss      = shrink s
+                                in map (o,) ss ++ map (,s) os
+
+              f key = do mv <- BU.parseOneChunked' BU.testImp
+                         BU.info BU.testImp (show (("key", key), ("val", mv)))
+
+              check (o, s) = case BU.runOn (`BU.streamKeyVals` f) (o ++ s) of
+                ((), i) -> counterexample (show ("state", i)) $
+                  ("next"    , BU.next     i) === ("next"    , s        ) .&&.
+                  ("previous", BU.previous i) === ("previous", reverse o)
+
+           in forAllShrink gen shrink' check
+
+parseEquivalent = testProperty "parseOne' equivalent to parseOneChunked'" go
+  where go  = forAllShrink ((,) <$> sized genJSON  <*> arbitrary) shrink' check
+
+        check :: (String, String) -> Property
+        check (json, extra) =
+          let s          = json ++ extra
+              (omb, oi ) = old s
+              (nmb, ni ) = new s
+              nms        = LB.unpack <$> nmb
+
+           in ("state", ni        ) === ("state", oi        ) .&&.
+              ("got"  , nmb       ) === ("got"  , omb       ) .&&.
+              ("json" , nms       ) === ("json" , Just json ) .&&.
+              ("next" , BU.next ni) === ("next" , extra     )
+
+        old = BU.runOn BU.parseOne'
+        new = BU.runOn BU.parseOneChunked'
+
+        shrink' :: (String, String) -> [(String, String)]
+        shrink' (json, extra) =
+          let Just j   = A.decode (LB.pack json) :: Maybe A.Value
+              js       = map ((,extra) . LB.unpack . A.encode) (shrinkJSON j)
+              (s1, s2) = splitAt (length extra `div` 2) extra
+           in case extra of
+                ""  -> js
+                [c] -> (json, "") : js
+                _   -> (json, s1) : (json, s2) : js
+
+augmentRepArray = testFewer $ testGroup "Rep handling" [
+                  testProperty "Read whole array"    (go checkPost   )
+    ,             testProperty "Output is parseable" (go checkOutput )
+    ,             testProperty "Have right methods"  (go checkMethods)
+    , testFewer $ testProperty "Check buckets"       (go checkBuckets)
     ]
 
-  where go f (AA args) = let result = BU.runOn GGT.augmentRep (render args)
-                             -- Show final state if there's a failure
-                          in counterexample (show ("result", result))
-                                            (f args result)
+  where go f aa@(AA args) = let result = BU.runOn GGT.augmentRep (renderAA aa)
+                                -- Show final state if there's a failure
+                             in counterexample (show ("result", result))
+                                               (f args result)
 
         checkPost args@(_, _, _, post) (_, x) = BU.next x === post
 
         checkOutput _ (_, x) =
-          let inner = parseOut (reverse (BU.out x))
+          let inner = parseOut (BU.out x)
            in isJust inner
 
         checkMethods args@(methods, _, _, _) (_, x) =
-          let Just obj        = parseOut (reverse (BU.out x))
+          let Just obj        = parseOut (BU.out x)
               (names, values) = unzip (Map.toList obj)
            in sort methods === sort names
 
         checkBuckets args (_, x) =
-          let Just obj    = parseOut (reverse (BU.out x))
+          let Just obj    = parseOut (BU.out x)
               (_, values) = unzip (Map.toList obj)
            in conjoin (map (checkMethod args) values)
 
@@ -84,30 +140,55 @@ augmentArray = localOption (QuickCheckTests 3) $ testGroup "Rep handling" [
                                     (property (n `elem` ns))
            in conjoin (map ok (concat lst))
 
-        render args@(methods, sizes, names, post) =
-          let sample = Map.fromList [("sampleNames", map nameToString names)]
-
-              obj :: Map.Map String (Map.Map String [[String]])
-              obj = Map.fromList $ map (\m -> (m, renderMethod args))
-                                       methods
-           in LB.unpack (A.encode (sample, obj)) ++ post
-
-        renderMethod args@(_, sizes, _, _) =
-          Map.fromList (map (\(s, content) -> (s, renderBucket args content))
-                            sizes)
-
-        renderBucket (_, _, names, _) content =
-          let ns       = map nameToString names
-              select n = if n < length ns
-                            then ns !! n  -- Safe thanks to our Arbitrary instance
-                            else error (show ("length ns", length ns, "n", n))
-           in map (map select) content
-
-augmentNull = testProperty "Can handle null reps" go
+augmentRepNull = testProperty "Can handle null reps" go
   where go post = check post (BU.runOn GGT.augmentRep ("null" ++ post))
 
         check post (_, x) = BU.previous x === "llun" .&&.
                             BU.next     x === post
+
+augmentSize = testFewer $
+    testProperty "Can augment sizes" (forAllShrink (sized gen) shrink' check)
+  where gen :: Int -> Gen (String, String)
+        gen n = (,) <$> genSize n <*> arbitrary
+
+        shrink' (s, post) = let Just (A.Object o) = A.decode (LB.pack s)
+                             in map ((, post)  .
+                                     LB.unpack .
+                                     A.encode  .
+                                     HM.fromList)   .
+                                shrinkKvs (pure []) shrinkRep .
+                                HM.toList $ o
+
+        shrinkRep r = []
+
+        check (size, post) = case BU.runOn GGT.augmentSize (size ++ post) of
+          ((), i) -> counterexample (show ("state", i)) $
+            ("next", BU.next i) === ("next", post)
+
+getGroundTruths = testGroup "getGroundTruths.main'" [
+      testProperty "getGroundTruths from empty" empty
+    , testFewer $ testProperty "Can run getGroundTruths.main'"
+                    (forAllShrink (sized gen) shrink' check)
+    ]
+  where empty = case BU.runOn GGT.main' "{}" of
+          ((), s) -> BU.out  s === "{}" .&&.
+                     BU.next s === ""
+
+        gen n = do post  <- arbitrary
+                   sizes <- genList genSize n
+                   obj   <- genObjWithValues sizes
+                   pure (obj, post)
+
+        shrink' (json, post) =
+          let posts             = shrink post
+              Just (A.Object o) = A.decode (LB.pack json)
+              os                = map (LB.unpack . A.encode) (shrinkO o)
+           in map (, post) os ++ map (json,) posts
+
+        check (json, post) = case BU.runOn GGT.main' (json ++ post) of
+          ((), s) -> counterexample (show ("state", s)) $
+            ("previous", BU.previous s) === ("previous", reverse json) .&&.
+            ("next"    , BU.next     s) === ("next"    , post        )
 
 benchmarks = testGroup "Benchmarks" [
     ]
@@ -181,6 +262,8 @@ subset = testGroup "Can find subsets" [
                          mkAscendingList ys))
 
 -- Helpers
+
+testFewer = localOption (QuickCheckTests 10)
 
 type Dep         = String
 type Method      = String
@@ -293,6 +376,25 @@ instance Arbitrary ArrayArgs where
                           else [AA (methods, sizes, names, post') |
                                 post' <- halves post]
 
+renderAA :: ArrayArgs -> String
+renderAA (AA args@(methods, sizes, names, post)) =
+    let sample = Map.fromList [("sampleNames", map nameToString names)]
+
+        obj :: Map.Map String (Map.Map String [[String]])
+        obj = Map.fromList $ map (\m -> (m, renderMethod args))
+                                       methods
+     in LB.unpack (A.encode (sample, obj)) ++ post
+
+  where renderMethod args@(_, sizes, _, _) =
+          Map.fromList (map (\(s, content) -> (s, renderBucket args content))
+                            sizes)
+
+        renderBucket (_, _, names, _) content =
+          let ns       = map nameToString names
+              select n = if n < length ns
+                            then ns !! n  -- Safe thanks to our Arbitrary instance
+                            else error (show ("length ns", length ns, "n", n))
+           in map (map select) content
 
 parseOut :: String -> Maybe (Map.Map Method (Map.Map BucketCount [[String]]))
 parseOut s = do
@@ -341,3 +443,154 @@ depNames = nub (concatMap get GGT.theoremDeps)
 
 genAscNames :: Int -> Gen (AscendingList Name)
 genAscNames n = mkAscendingList . nub <$> vectorOf n arbitrary
+
+-- | Generate a String of JSON, with a few restrictions. In particular, we don't
+--   (yet) bother randomising the whitespace, we don't generate floats or
+--   negative numbers and the top-level value will not be a number. These
+--   restrictions on numbers are to appease our parser's quirks.
+genJSON :: Int -> Gen String
+genJSON n = oneof [genArr n, genObj n, genStr, genKeyword]
+  where go fuel = case fuel of
+                    0 -> oneof [genStr, genNum, genKeyword]
+                    _ -> do c <- choose (0, 2) :: Gen Int
+                            case c of
+                              0 -> genArr fuel
+                              1 -> genObj fuel
+                              _ -> go     0
+
+-- | Generate a String containing a valid, non-empty JSON string (including the
+--   quotes). We don't include non-ASCII characters, but we do include (escaped)
+--   backslashes and double-quotes (except the at the start and end, obv.).
+genStr = do c  <- genChar
+            cs <- listOf genChar
+            pure . wrap "\"" "\"" . concatMap esc $ c:cs
+  where genChar = oneof (map pure chars)
+
+        chars = concat $ [
+            "abcdefghijklmnopqrstuvwxyz"
+          , "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+          , "0123456789!\"£$%^&*()-_=+{[}]:;@'~#<,>.?/|\\"
+          ]
+
+        esc '"'  = "\\\""
+        esc '\\' = "\\\\"
+        esc c    = [c]
+
+-- | Generate a String containing a positive, whole number.
+genNum = show . abs <$> (arbitrary :: Gen Int)
+
+-- | Pick a random JSON keyword (null, true or false)
+genKeyword :: Gen String
+genKeyword = oneof (map return ["null", "true", "false"])
+
+-- | Generate a String containing a JSON array. The parameter is "fuel", used to
+--   control the size.
+genArr :: Int -> Gen String
+genArr fuel = wrap "[" "]" <$> (genList genJSON fuel >>= commaSep)
+
+-- | Generate a String containing a JSON object. The parameter is "fuel", used
+--   to control the size.
+genObj :: Int -> Gen String
+genObj fuel = genList genJSON fuel >>= genObjWithValues
+
+-- | Replace duplicate keys with freshly generated ones
+uniqueKeys :: [String] -> [(String, a)] -> Gen [(String, a)]
+uniqueKeys seen kvs = case kvs of
+  []          -> pure []
+  (k, v):kvs' -> if k `elem` seen
+                    then do k' <- genStr
+                            uniqueKeys seen ((k', v):kvs')
+                    else ((k, v):) <$> uniqueKeys (k:seen) kvs'
+
+-- | Generate a JSON object with randomly generated keys, where the values are
+--   taken from the given list.
+genObjWithValues :: [String] -> Gen String
+genObjWithValues vals = do keys <- vectorOf (length vals) genStr
+                           uniqueKeys [] (zip keys vals) >>= mkObj
+
+-- | Turn (key, value) pairs of JSON into a JSON object.
+mkObj :: [(String, String)] -> Gen String
+mkObj kvs = mapM pairUp kvs >>= commaSep >>= (pure . wrap "{" "}")
+  where pairUp (k, v) = do [a, b, c, d] <- vectorOf 4 (genSpace 3)
+                           pure (concat [a, k, b, ":", c, v, d])
+
+-- | Join the given strings together, interspersed with commas. Random
+--   whitespace will be added at the start, end and between the commas.
+commaSep :: [String] -> Gen String
+commaSep []     = genSpace 3
+commaSep [x]    = (x ++) <$> genSpace 3
+commaSep (x:xs) = do pre <- genSpace 3
+                     suf <- genSpace 3
+                     ((pre ++ x ++ suf ++ ",") ++) <$> commaSep xs
+
+-- | Add a prefix and suffix the a third String.
+wrap :: String -> String -> String -> String
+wrap pre suf = (++ suf) . (pre ++)
+
+-- | Generate a list of values, using the given generator for each element. A
+--   "fuel" parameter will be divided up amongst the calls, preventing unbounded
+--   recursion.
+genList :: (Int -> Gen a) -> Int -> Gen [a]
+genList _   0 = return []
+genList gen 1 = return <$> gen 0
+genList gen n = do fuel <- choose (1, n)
+                   x    <- gen fuel
+                   xs   <- genList gen (n - fuel)
+                   return (x:xs)
+
+-- | Generate a String containing JSON for one "rep".
+genRep n = if n == 0
+              then pure "null"
+              else do AA (ms, ss, ns, _) <- arbitrary
+                      pure (renderAA (AA (ms, ss, ns, "")))
+
+-- | Generate a String containing JSON for one "size".
+genSize n = genList genRep n >>= genObjWithValues
+
+-- | Shrink an Aeson Value; useful with 'forAllShrink'.
+shrinkJSON :: A.Value -> [A.Value]
+shrinkJSON j = case j of
+  A.Bool True -> [A.Null, A.Bool False]
+  A.Bool _    -> [A.Null]
+  A.Null      -> []
+  A.Object o  -> A.Null : map A.Object (shrinkO o)
+  A.Array  a  -> A.Null : map A.Array  (shrinkA a)
+  A.String t  -> A.Null : map A.String (shrinkT t)
+  A.Number n  -> A.Null : map A.Number (shrinkN n)
+
+-- | Shrink a HashMap; map Aeson's 'Object' over this make JSON Values.
+shrinkO o = let lst = HM.toList o
+                len = length lst
+                (pre, suf) = splitAt (len `div` 2) lst
+             in case len of
+                  0 -> []
+                  1 -> let [(k, v)] = lst
+                           ks = shrinkT k
+                           vs = shrinkJSON v
+                           os = map (,v) ks ++ map (k,) vs
+                        in map (HM.fromList . pure) os
+                  _ -> [HM.fromList pre, HM.fromList suf]
+
+-- | Shrink a Vector; map Aeson's 'Array' over this to make JSON values.
+shrinkA a = let lst = V.toList a
+                len = length lst
+                (pre, suf) = splitAt (len `div` 2) lst
+             in case len of
+                  0 -> []
+                  1 -> let [x] = lst
+                           xs  = shrinkJSON x
+                        in map (V.fromList . pure) xs
+                  _ -> [V.fromList pre, V.fromList suf]
+
+-- | Shrink a Text; map Aeson's 'String' over this to make JSON values.
+shrinkT t = map T.pack (shrink (T.unpack t))
+
+-- | Shrink a Scientific; map Aeson's 'Number' over this to make JSON values.
+shrinkN n = if n == 0 then [] else [0]
+
+shrinkKvs :: (key -> [key]) -> (val -> [val]) -> [(key, val)] -> [[(key, val)]]
+shrinkKvs fk fv kvs = case kvs of
+  []       -> []
+  [(k, v)] -> map pure $ map (k,) (fv v) ++ map (,v) (fk k)
+  _        -> let (pre, suf) = splitAt (length kvs `div` 2) kvs
+               in [pre, suf]

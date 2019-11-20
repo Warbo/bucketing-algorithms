@@ -31,7 +31,10 @@ with rec {
 
             bucketers = [HashBucket.bucketer, RecurrentBucket.bucketer]
 
-            main = BucketUtil.bucketStdio bucketers AstsOf.astsOf'
+            main = do imp <- BucketUtil.buf
+                      BucketUtil.runBIO (BucketUtil.bucketStdio imp
+                                                                bucketers
+                                                                AstsOf.astsOf')
           '';
         });
       }
