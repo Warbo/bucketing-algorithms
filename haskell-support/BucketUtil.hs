@@ -193,30 +193,6 @@ debug msg = do shouldDebug <- lookupEnv "DEBUG"
                  Just "1" -> hPutStrLn stderr msg
                  _        -> pure ()
 
--- | Default implementation of getuntil, in terms of getchar. This will work,
---   but building the result one Char at a time is not very fast.
-getuntilDefault :: Monad m
-                => StreamImp m
-                -> (s -> Char -> (s, Bool))
-                -> s
-                -> m (s, LBS.ByteString)
-getuntilDefault imp = go LBS.empty
-    where go !acc f s = do c <- getchar imp
-                           let acc' = LBS.snoc acc c
-                           case f s c of
-                             (s', True) -> return (s', acc')
-                             (s', _   ) -> go acc' f s'
-
--- Specialises StreamImp to IO
-io = StreamImp {
-      getchar     = getChar
-    , getcontents = LBS.getContents
-    , getuntil    = getuntilDefault io
-    , info        = LBS.hPut stderr . LBS.pack
-    , putchar     = putChar
-    , putstr      = LBS.putStr
-    }
-
 newtype BufferedIO a = BIO { runBIO :: IO a }
 
 instance Functor BufferedIO where
@@ -249,9 +225,9 @@ buf = do -- Read all stdin (lazily) into a local buffer
            , getuntil    = \f s -> apply b (getuntil' f s)
 
            -- The following don't use stdin, so we can defer to io
-           , info        = BIO . info io
-           , putchar     = BIO . putchar io
-           , putstr      = BIO . putstr io
+           , info        = BIO . LBS.hPut stderr . LBS.pack
+           , putchar     = BIO . putChar
+           , putstr      = BIO . LBS.putStr
            }
   where -- Update the buffer (strictly) and return a value
         apply :: IORef LBS.ByteString
@@ -294,24 +270,24 @@ buf = do -- Read all stdin (lazily) into a local buffer
                 (!n, !final) -> case LBS.splitAt n str of
                                   (!pre, !suf) -> (suf, (final, pre))
 
-bucketStdio :: Monad m
-            => StreamImp m
-            -> [Bucketer]
-            -> ([TL.Text] -> [TL.Text])
-            -> m ()
-bucketStdio imp brs f = processSizes imp (astsOf f, brs)
-
 -- We read in JSON and write out JSON with the same structure, plus some extras.
 -- It's wasteful to accumulate this in memory, so instead we process one rep at
 -- a time.
 
-processSizes imp opts      =  streamKeyVals imp (processSize imp opts)
-
-processSize  imp opts size = do putstr imp (LBS.filter (/= ',') size)
-                                putchar imp ':'
-                                processKeyVals imp (processRep imp opts size)
-
 type Args = ([Name] -> [AST], [Bucketer])
+
+bucketStdio :: forall m
+            => StreamImp m
+            -> [Bucketer]
+            -> ([TL.Text] -> [TL.Text])
+            -> m ()
+bucketStdio imp brs f = processSizes (astsOf f, brs)
+  where processSizes opts      =  streamKeyVals imp (processSize opts)
+
+        processSize  opts size = do
+          putstr imp (LBS.filter (/= ',') size)
+          putchar imp ':'
+          processKeyVals imp (processRep imp opts size)
 
 processRep :: Monad m
            => StreamImp m
@@ -325,6 +301,7 @@ processRep imp (astsOf, bucketers) size !key !bs = do
     putstr imp key
     putstr imp ": "
     putstr imp go
+
   where go = case A.eitherDecode bs' of
                Left _ -> case A.eitherDecode bs' of
                            Right A.Null -> A.encode A.Null

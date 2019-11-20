@@ -688,6 +688,11 @@ genJSON n = oneof [genArr n, genObj n, genStr, genKeyword]
                               1 -> genObj fuel
                               _ -> go     0
 
+        -- | Generate a String containing a JSON array. The parameter is "fuel",
+        --   used to control the size.
+        genArr :: Int -> Gen String
+        genArr fuel = wrap "[" "]" <$> (genList genJSON fuel >>= commaSep)
+
 -- | Generate a String containing a valid, non-empty JSON string (including the
 --   quotes). We don't include non-ASCII characters, but we do include (escaped)
 --   backslashes and double-quotes (except the at the start and end, obv.).
@@ -713,36 +718,31 @@ genNum = show . abs <$> (arbitrary :: Gen Int)
 genKeyword :: Gen String
 genKeyword = oneof (map return ["null", "true", "false"])
 
--- | Generate a String containing a JSON array. The parameter is "fuel", used to
---   control the size.
-genArr :: Int -> Gen String
-genArr fuel = wrap "[" "]" <$> (genList genJSON fuel >>= commaSep)
-
 -- | Generate a String containing a JSON object. The parameter is "fuel", used
 --   to control the size.
 genObj :: Int -> Gen String
 genObj fuel = genList genJSON fuel >>= genObjWithValues
-
--- | Replace duplicate keys with freshly generated ones
-uniqueKeys :: [String] -> [(String, a)] -> Gen [(String, a)]
-uniqueKeys seen kvs = case kvs of
-  []          -> pure []
-  (k, v):kvs' -> if k `elem` seen
-                    then do k' <- genStr
-                            uniqueKeys seen ((k', v):kvs')
-                    else ((k, v):) <$> uniqueKeys (k:seen) kvs'
 
 -- | Generate a JSON object with randomly generated keys, where the values are
 --   taken from the given list.
 genObjWithValues :: [String] -> Gen String
 genObjWithValues vals = do keys <- vectorOf (length vals) genStr
                            uniqueKeys [] (zip keys vals) >>= mkObj
+  where -- | Turn (key, value) pairs of JSON into a JSON object.
+        mkObj :: [(String, String)] -> Gen String
+        mkObj kvs = mapM pairUp kvs >>= commaSep >>= (pure . wrap "{" "}")
 
--- | Turn (key, value) pairs of JSON into a JSON object.
-mkObj :: [(String, String)] -> Gen String
-mkObj kvs = mapM pairUp kvs >>= commaSep >>= (pure . wrap "{" "}")
-  where pairUp (k, v) = do [a, b, c, d] <- vectorOf 4 (genSpace 3)
+        pairUp (k, v) = do [a, b, c, d] <- vectorOf 4 (genSpace 3)
                            pure (concat [a, k, b, ":", c, v, d])
+
+        -- | Replace duplicate keys with freshly generated ones
+        uniqueKeys :: [String] -> [(String, a)] -> Gen [(String, a)]
+        uniqueKeys seen kvs = case kvs of
+          []          -> pure []
+          (k, v):kvs' -> if k `elem` seen
+                            then do k' <- genStr
+                                    uniqueKeys seen ((k', v):kvs')
+                            else ((k, v):) <$> uniqueKeys (k:seen) kvs'
 
 -- | Join the given strings together, interspersed with commas. Random
 --   whitespace will be added at the start, end and between the commas.
@@ -768,14 +768,13 @@ genList gen n = do fuel <- choose (1, n)
                    xs   <- genList gen (n - fuel)
                    return (x:xs)
 
--- | Generate a String containing JSON for one "rep".
-genRep n = if n == 0
-              then pure "null"
-              else do AA (ms, ss, ns, _) <- arbitrary
-                      pure (renderAA (AA (ms, ss, ns, "")))
-
 -- | Generate a String containing JSON for one "size".
-genSize n = genList genRep n >>= genObjWithValues
+genSize fuel = genList genRep fuel >>= genObjWithValues
+  where -- | Generate a String containing JSON for one "rep".
+        genRep n = if n == 0
+                      then pure "null"
+                      else do AA (ms, ss, ns, _) <- arbitrary
+                              pure (renderAA (AA (ms, ss, ns, "")))
 
 -- | Shrink an Aeson Value; useful with 'forAllShrink'.
 shrinkJSON :: A.Value -> [A.Value]
