@@ -196,35 +196,29 @@ getGroundTruths = testGroup "getGroundTruths.main'" [
             ("next"    , next     s) === ("next"    , post        )
 
 haveDeps = testGroup "Have theorem deps to look up" [
-      testProperty "Look up decoded deps" (forAllShrink genDec shrink' getDec)
-    , testProperty "Look up encoded deps" (forAllShrink genEnc shrink' getEnc)
+      testProperty "Look up encoded deps" (forAllShrink genEnc shrink' getEnc)
     ]
-  where genDec :: Gen (Helper.TheoremID, [Helper.Name], [Helper.Name])
-        genDec = do (t, deps) <- elements GGT.theoremDeps
-                    extra     <- arbitrary
-                    pure (t, unAsc deps, extra)
+  where genEnc :: Gen (Helper.TheoremID, [Name], [Name])
+        genEnc = do (t, deps) <- elements GGT.theoremDeps
+                    unseen    <- (Helper.N . T.pack) <$> arbitrary
+                    extra     <- listOf (elements
+                                          (unseen:concatMap (unAsc . snd)
+                                                            GGT.theoremDeps))
+                    let deps' = unAsc deps
+                    pure ( t
+                         , map encodeName deps'
+                         , map encodeName extra
+                         )
 
-        genEnc :: Gen (Helper.TheoremID, [Helper.Name], [Helper.Name])
-        genEnc = do (t, deps, extra) <- genDec
-                    pure (t, map encodeName deps, map encodeName extra)
-
+        shrink' :: Arbitrary c => (a, b, c) -> [(a, b, c)]
         shrink' (t, deps, extra) = (t, deps,) <$> shrink extra
 
-        getDec (t, deps, extra) =
-          let got = GGT.theoremFilesAdmittedBy' GGT.theoremDeps
-                      (mkAscendingList (deps ++ extra))
-           in counterexample (show (("want", t     )
-                                   ,("got" , got   )
-                                   ,("deps", deps  )
-                                   ,("extra", extra)
-                                   )) $
-                property (t `elem` got)
-
+        getEnc :: (Helper.TheoremID, [Name], [Name]) -> Property
         getEnc (t, deps, extra) =
           let got = GGT.theoremFilesAdmittedBy (mkAscendingList (deps ++ extra))
-           in counterexample (show (("want", t)
-                                   ,("got", got)
-                                   ,("deps", deps)
+           in counterexample (show (("want" , t    )
+                                   ,("got"  , got  )
+                                   ,("deps" , deps )
                                    ,("extra", extra)
                                    )) $
                 property (t `elem` got)
