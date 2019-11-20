@@ -40,8 +40,10 @@ main = do
     , augmentSize
     , benchmarks
     , canSortUniq
+    , encodeDecode
     , findColon
     , getGroundTruths
+    , haveDeps
     , parseEquivalent
     , parseWorks
     , subset
@@ -190,6 +192,40 @@ getGroundTruths = testGroup "getGroundTruths.main'" [
             ("previous", BU.previous s) === ("previous", reverse json) .&&.
             ("next"    , BU.next     s) === ("next"    , post        )
 
+haveDeps = testGroup "Have theorem deps to look up" [
+      testProperty "Look up decoded deps" (forAllShrink genDec shrink' getDec)
+    , testProperty "Look up encoded deps" (forAllShrink genEnc shrink' getEnc)
+    ]
+  where genDec :: Gen (Helper.TheoremID, [Helper.Name], [Helper.Name])
+        genDec = do (t, deps) <- elements GGT.theoremDeps
+                    extra     <- arbitrary
+                    pure (t, unAsc deps, extra)
+
+        genEnc :: Gen (Helper.TheoremID, [Helper.Name], [Helper.Name])
+        genEnc = do (t, deps, extra) <- genDec
+                    pure (t, map encodeName deps, map encodeName extra)
+
+        shrink' (t, deps, extra) = (t, deps,) <$> shrink extra
+
+        getDec (t, deps, extra) =
+          let got = GGT.theoremFilesAdmittedBy' GGT.theoremDeps
+                      (mkAscendingList (deps ++ extra))
+           in counterexample (show (("want", t     )
+                                   ,("got" , got   )
+                                   ,("deps", deps  )
+                                   ,("extra", extra)
+                                   )) $
+                property (t `elem` got)
+
+        getEnc (t, deps, extra) =
+          let got = GGT.theoremFilesAdmittedBy (mkAscendingList (deps ++ extra))
+           in counterexample (show (("want", t)
+                                   ,("got", got)
+                                   ,("deps", deps)
+                                   ,("extra", extra)
+                                   )) $
+                property (t `elem` got)
+
 benchmarks = testGroup "Benchmarks" [
     ]
   where beats (fastName, fastF) (slowName, slowF) gen =
@@ -228,6 +264,24 @@ canSortUniq = testProperty "sortUniq sorts and removes dupes" go
         add xs (_, x) = x:xs
 
         check want (AscendingList got) = want === got
+
+encodeDecode = testGroup "Encoding and decoding names" [
+      testProperty "Decode then encode round-trips"     decEnc
+    , testProperty "Decode, encode, decode round-trips" decEncDec
+    ]
+  where decEnc    want = let got = Helper.encodeName (Helper.decodeName want)
+                          in counterexample (show (("want", want)
+                                                  ,("got" , got)
+                                                  )) $
+                             want === got
+
+        decEncDec name = let want = Helper.decodeName name
+                             got  = Helper.decodeName (Helper.encodeName want)
+                          in counterexample (show (("name", name)
+                                                  ,("want", want)
+                                                  ,("got" , got )
+                                                  )) $
+                             want === got
 
 findColon = testProperty "Can find colons" go
   where go :: String -> Int -> Property

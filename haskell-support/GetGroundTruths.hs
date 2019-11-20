@@ -22,8 +22,12 @@ import qualified Numeric                    as N
 import qualified System.Environment         as Env
 import           System.IO.Unsafe           (unsafePerformIO)
 
-theoremDeps :: [(TheoremID, AscendingList Name)]
-theoremDeps = map wrapSecond unwrapped
+-- | Database of theorem dependencies, read at compile time. These are in two
+--   forms: theoremDeps are the human-readable names; encodedDeps are
+--   hex-encoded. The latter are directly comparable to sampled names, which
+--   prevents having to do a bunch of decoding over and over.
+theoremDeps, encodedDeps :: [(TheoremID, AscendingList Name)]
+(theoremDeps, encodedDeps) = (map wrapSecond unwrapped, map wrapSecond encoded)
   where -- At run time we convert each (already sorted) list of deps into an
         -- 'AscendingList'. This is a newtype so there's minimal overhead.
         wrapSecond (t, deps) = (t, AscendingList deps)
@@ -31,7 +35,7 @@ theoremDeps = map wrapSecond unwrapped
         -- Build the datastructure at compile time, including sorting the deps
         -- into ascending order. There's no 'Lift' instance for 'AscendingList'
         -- so we leave them as regular lists.
-        unwrapped =
+        (unwrapped, encoded) =
           $(let name = "BENCHMARKS_THEOREM_DEPS"
 
                 lispToData l = case L.parseEither L.parseLisp l of
@@ -43,16 +47,24 @@ theoremDeps = map wrapSecond unwrapped
                                  Left  e -> error e
                                  Right l -> lispToData l
 
-                sortSecond (t, deps) = (t, List.sort deps)
+                sortSecond f (t, deps) = (t, List.sort (map f deps))
+
+                sorted f = map (sortSecond f)
 
              in do mp <- runIO (Env.lookupEnv name)
                    s  <- case mp of
                            Nothing -> error ("Env doesn't contain " ++ name)
                            Just p  -> runIO (B.readFile p)
-                   lift (map sortSecond (strToData s)))
+                   let d = strToData s
+                   lift (sorted id d, sorted encodeName d))
 
 theoremFilesAdmittedBy :: AscendingList Name -> [TheoremID]
-theoremFilesAdmittedBy sample = map fst (filter match theoremDeps)
+theoremFilesAdmittedBy = theoremFilesAdmittedBy' encodedDeps
+
+theoremFilesAdmittedBy' :: [(TheoremID, AscendingList Name)]
+                        -> AscendingList Name
+                        -> [TheoremID]
+theoremFilesAdmittedBy' db sample = map fst (filter match db)
   where match td = snd td `subsetAsc` sample
 
 mkResult :: LB.ByteString -> Result
@@ -65,8 +77,7 @@ mkResult' :: Either [Name] [[Name]] -> Result
 mkResult' ns = R { names = ns, theorems = either process nested ns }
   where process :: [Name] -> [TheoremID]
         process [] = []
-        process ns = theoremFilesAdmittedBy (mkAscendingList (map decodeName
-                                                                  ns))
+        process ns = theoremFilesAdmittedBy (mkAscendingList ns)
 
         nested :: [[Name]] -> [TheoremID]
         nested []  = []

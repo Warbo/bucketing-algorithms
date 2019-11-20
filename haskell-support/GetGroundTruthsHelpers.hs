@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
@@ -15,7 +14,7 @@ import qualified Data.HashMap.Strict        as H
 import qualified Data.List                  as List
 import qualified Data.Maybe                 as M
 import qualified Data.Text                  as T
-import           Language.Haskell.TH.Syntax (Exp(..), Lift, lift)
+import           Language.Haskell.TH.Syntax (Exp (..), Lift, lift)
 import qualified Numeric                    as N
 import qualified System.Environment         as Env
 import           System.IO.Unsafe           (unsafePerformIO)
@@ -43,7 +42,7 @@ instance L.FromLisp Name where
     where unescapeSym s = case T.stripPrefix "|" s of
                             Nothing -> s
                             Just s2 -> case T.stripSuffix "|" s2 of
-                                         Nothing  -> s
+                                         Nothing -> s
                                          Just s3 -> s3
 
 newtype TheoremDeps = TDs [(TheoremID, [Name])]
@@ -82,6 +81,11 @@ decodeName (N n) = case M.catMaybes [T.stripPrefix "global" n,
         unHex a b = case N.readHex [a, b] of
                       [(n, "")] -> C.chr n
                       _         -> error (show ("Invalid hex", a, b))
+
+encodeName (N name) = N (T.append "global"
+                                  (T.pack (hex (T.unpack name))))
+  where hex ""     = ""
+        hex (c:cs) = N.showHex (C.ord c) (hex cs)
 
 nub :: (Eq a, Ord a) => [a] -> [a]
 nub = go [] . List.sort
