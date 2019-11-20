@@ -10,6 +10,7 @@ import qualified Data.Attoparsec.ByteString as AP
 import qualified Data.ByteString.Char8      as B
 import qualified Data.ByteString.Lazy       as LB
 import qualified Data.Char                  as C
+import qualified Data.Hashable              as Hash
 import qualified Data.HashMap.Strict        as H
 import qualified Data.List                  as List
 import qualified Data.Maybe                 as M
@@ -44,6 +45,9 @@ instance L.FromLisp Name where
                             Just s2 -> case T.stripSuffix "|" s2 of
                                          Nothing -> s
                                          Just s3 -> s3
+
+instance Hash.Hashable Name where
+  hashWithSalt salt (N t) = Hash.hashWithSalt salt t
 
 newtype TheoremDeps = TDs [(TheoremID, [Name])]
 

@@ -26,16 +26,34 @@ import           System.IO.Unsafe           (unsafePerformIO)
 --   forms: theoremDeps are the human-readable names; encodedDeps are
 --   hex-encoded. The latter are directly comparable to sampled names, which
 --   prevents having to do a bunch of decoding over and over.
-theoremDeps, encodedDeps :: [(TheoremID, AscendingList Name)]
-(theoremDeps, encodedDeps) = (map wrapSecond unwrapped, map wrapSecond encoded)
+--
+--   nameMap is a HashMap turning (encoded) Names into Ints. This makes
+--   comparison faster when checking for subsets. Note that we can only map
+--   names which appear in theoremDeps, so looking up arbitrary, user-supplied
+--   Names in nameMap might fail. To account for this, our numbering starts at
+--   1; this allows unknown Names to be represented as 0 (i.e. as the default
+--   value for failed lookups). Since 0 is guaranteed not to appear in any
+--   theorem dependencies, subset checking will still behave correctly.
+theoremDeps :: [(TheoremID, AscendingList Name)]
+encodedDeps :: [(TheoremID, AscendingList Int )]
+nameMap     :: H.HashMap Name Int
+(theoremDeps, encodedDeps, nameMap) =
+    ( map wrapSecond unwrapped
+    , map wrapSecond encoded
+    , H.fromList (zip names [1..])
+    )
   where -- At run time we convert each (already sorted) list of deps into an
         -- 'AscendingList'. This is a newtype so there's minimal overhead.
+        wrapSecond :: (a, [b]) -> (a, AscendingList b)
         wrapSecond (t, deps) = (t, AscendingList deps)
 
         -- Build the datastructure at compile time, including sorting the deps
         -- into ascending order. There's no 'Lift' instance for 'AscendingList'
         -- so we leave them as regular lists.
-        (unwrapped, encoded) =
+        unwrapped :: [(TheoremID, [Name])]
+        encoded   :: [(TheoremID, [Int ])]
+        names     :: [Name]
+        (unwrapped, encoded, names) =
           $(let name = "BENCHMARKS_THEOREM_DEPS"
 
                 lispToData l = case L.parseEither L.parseLisp l of
@@ -51,21 +69,42 @@ theoremDeps, encodedDeps :: [(TheoremID, AscendingList Name)]
 
                 sorted f = map (sortSecond f)
 
+                ascEnc = List.sort . map encodeName . List.nub
+
+                toInt :: [Name] -> Name -> Int
+                toInt ns n =
+                  let n' = encodeName n
+                   in case List.elemIndex n' ns of
+                        Nothing -> error (show (("error"  , "Didn't find name")
+                                               ,("name"   , n                 )
+                                               ,("encoded", n'                )
+                                               ,("names"  , ns                )
+                                               ))
+                        Just i  -> i + 1
+
              in do mp <- runIO (Env.lookupEnv name)
                    s  <- case mp of
                            Nothing -> error ("Env doesn't contain " ++ name)
                            Just p  -> runIO (B.readFile p)
                    let d = strToData s
-                   lift (sorted id d, sorted encodeName d))
+
+                       -- All theorem deps, encoded, deduped and sorted
+                       names = ascEnc (concatMap snd d)
+                   lift ( sorted id            d
+                        , sorted (toInt names) d
+                        , names))
+
+-- | Look up an encoded Name in nameMap, so that we can do integer comparisons
+--   when comparing subsets. The default value, when the given Name isn't found,
+--   is 0. Since theorem dependencies are numbered starting at 1, this will not
+--   match any theorem, hence giving the correct results for subset matching.
+nameToInt :: Name -> Int
+nameToInt n = H.lookupDefault 0 n nameMap
 
 theoremFilesAdmittedBy :: AscendingList Name -> [TheoremID]
-theoremFilesAdmittedBy = theoremFilesAdmittedBy' encodedDeps
-
-theoremFilesAdmittedBy' :: [(TheoremID, AscendingList Name)]
-                        -> AscendingList Name
-                        -> [TheoremID]
-theoremFilesAdmittedBy' db sample = map fst (filter match db)
-  where match td = snd td `subsetAsc` sample
+theoremFilesAdmittedBy sample = map fst (filter match encodedDeps)
+  where sample' = AscendingList (map nameToInt (unAsc sample))
+        match (_, td) = td `subsetAsc` sample'
 
 mkResult :: LB.ByteString -> Result
 mkResult = mkResult' . Right . M.fromJust . A.decode
