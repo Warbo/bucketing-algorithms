@@ -1,67 +1,80 @@
-{ bash, bucketProportions, fail, ghcWithML4HSFE, haskellPackages, jq,
-  makeSamples, mkBin, msgpack-tools, runCommand, tebenchmark, withDeps, wrap,
-  writeScript }:
+{ attrsToDirs', bash, bucketProportions, fail, ghcWithML4HSFE, haskellPackages,
+  jq, lzip, makeSamples, mkBin, msgpack-tools, runCommand, tebenchmark,
+  withDeps, wrap, writeScript }:
 
 with rec {
   # Takes a "Main" file and compiles it, with some fixed dependencies
-  buildMain = main: mkBin {
-    name   = "buildMain";
-    paths  = [ bash (ghcWithML4HSFE { extraPkgs = [ "criterion" ]; }) ];
-    vars   = {
-      inherit main;
-      helper1 = ../haskell-support/GetGroundTruthsHelpers.hs;
-      helper2 = ../haskell-support/GetGroundTruths.hs;
-      util    = ../haskell-support/BucketUtil.hs;
+  buildMain = { deps, name, profile ? false, script, test ? false }:
+    with rec {
+      ghc  = ghcWithML4HSFE { inherit profile; extraPkgs = [ "criterion" ]; };
+
+      code = attrsToDirs' "get-ground-truths-src" {
+        "GetGroundTruths.hs" = ../haskell-support/GetGroundTruths.hs;
+        "Helper.hs"          = ../haskell-support/GetGroundTruthsHelpers.hs;
+        "BucketUtil.hs"      = ../haskell-support/BucketUtil.hs;
+        "Main.hs"            = if test
+          then ../haskell-support/GetGroundTruthsTest.hs
+          else ../haskell-support/GetGroundTruthsMain.hs;
+      };
     };
+    runCommand "get-ground-truths-${name}"
+      (tebenchmark.cache // deps // { inherit code; buildInputs = [ ghc ]; })
+      ''
+        cp "$code"/*.hs ./
+        ${script}
+      '';
+
+  unitTests = buildMain {
+    name   = "tests";
+    deps   = {};
+    test   = true;
     script = ''
-      #!${bash}/bin/bash
-      cp "$helper1" Helper.hs
-      cp "$helper2" GetGroundTruths.hs
-      cp "$util"    BucketUtil.hs
-      cp "$main"    Main.hs
       ghc --make -O2 -o Main Main.hs
-    '';
-  };
-
-  # Provides buildMain, plus the data required by our TemplateHaskell
-  env = main: tebenchmark.cache // { buildInputs = [ (buildMain main) ]; };
-
-  haskellTests = runCommand "get-ground-truths-tests"
-    (env ../haskell-support/GetGroundTruthsTest.hs)
-    ''
-      buildMain
       ./Main || exit 1
       echo "Pass" > "$out"
     '';
+  };
 
-  haskellVersion = runCommand "get-ground-truths-haskell"
-    (env ../haskell-support/GetGroundTruthsMain.hs // { inherit haskellTests; })
-    ''
-      buildMain
-      mv Main "$out"
-    '';
-
-  go = wrap {
+  binary = wrap {
     name = "get-ground-truths";
-    file = haskellVersion;
-    vars = {
-      LANG   = "en_US.UTF-8";
-      LC_ALL = "C";
+    vars = { LANG = "en_US.UTF-8"; LC_ALL = "C"; };
+    file = buildMain {
+      name   = "get-ground-truths-without-env";
+      deps   = { inherit unitTests; };
+      script = ''
+        ghc --make -O2 -o Main Main.hs
+        mv Main "$out"
+      '';
     };
   };
 
-  test = runCommand "test-get-ground-truths"
-    {
-      inherit go;
+  # Inputs for testing and profiling; we want small ones to spot obvious errors,
+  # bigger ones to exercise the code a bit more, and a more realistic size to
+  # ensure profile information doesn't inflate overheads.
+  testSamples = {
+    smallSample = makeSamples { sizes = [ 2      ]; reps = 1;   };
+    midSample   = makeSamples { sizes = [ 1      ]; reps = 2;   };
+    bigSample   = makeSamples { sizes = [ 1 5 10 ]; reps = 3;   };
+    heftySample = makeSamples { maxSize = 7;        reps = 100; };
+  };
+
+  integrationTests = runCommand "test-get-ground-truths"
+    (testSamples // {
+      inherit
+        unitTests  # Only bother with these if the unit tests have passed
+        ;
       inherit (bucketProportions) addBuckets;
       buildInputs = [ fail jq msgpack-tools ];
+      go          = binary;
 
       # Manually simplified output of addBuckets. This triggered a bug in adding
       # ground truths, so we include it as a regression test.
       preBucketed =
         with {
-          n1 = "global746970323031352f77656972645f6e61745f6d756c335f6173736f63312e736d74326d756c33";
-          n2 = "global746970323031352f77656972645f6e61745f6f705f6173736f632e736d74326f70";
+          n1 = "global746970323031352f77656972645f6e61745f6d756c335f6173736f6" +
+               "3312e736d74326d756c33";
+          n2 = "global746970323031352f77656972645f6e61745f6f705f6173736f632e7" +
+               "36d74326f70";
         };
         writeScript "ground-truth-regression-test.json" (builtins.toJSON {
           size1 = {
@@ -75,11 +88,7 @@ with rec {
             ];
           };
         });
-
-      smallSample = makeSamples { sizes = [ 2      ]; reps = 1; };
-      midSample   = makeSamples { sizes = [ 1      ]; reps = 2; };
-      bigSample   = makeSamples { sizes = [ 1 5 10 ]; reps = 3; };
-    }
+    })
     ''
       echo -e "\nTesting non-JSON" 1>&2
       O=$(echo 'nope' | "$go" 2>&1) && fail "Non-JSON should error\n$O"
@@ -157,5 +166,34 @@ with rec {
 
       mkdir "$out"
     '';
+
+  # Build for profiling, and profile time usage on a moderately sized input
+  profiled = buildMain {
+    name    = "profiled";
+    deps    = {
+      inherit integrationTests;
+      inherit (bucketProportions) addBuckets;
+      samples = testSamples.heftySample;
+    };
+    profile = true;
+    script  = ''
+      DIR="$PWD"
+
+      # TemplateHaskell requires dynamic linking, which complicates profiling.
+      # We need to invoke GHC multiple times; these options came from
+      # https://github.com/haskell/cabal/issues/1553#issuecomment-36515415
+      function go { ghc --make -O2 "$@" -o Main Main.hs; }
+
+      go
+      go -prof -osuf p_o -fprof-auto
+
+      "$addBuckets" < "$samples" > data.json
+
+      mkdir "$out"
+      cd    "$out"
+      "$DIR"/Main +RTS -p < "$DIR"/data.json > /dev/null
+    '';
+  };
+
 };
-withDeps [ test ] go
+withDeps [ profiled ] binary
