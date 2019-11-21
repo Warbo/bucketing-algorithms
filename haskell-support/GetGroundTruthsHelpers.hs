@@ -74,6 +74,16 @@ subsetAsc (AscendingList l1) (AscendingList l2) = go l1 l2
                                  LT -> False
                                  EQ -> go xs b
                                  GT -> go a  ys
+-- | Check whether the given list is a subset of the AscendingList. This is
+--   faster than comparing with two unordered lists, since we can short-circuit
+--   when small values aren't found near the start of the AscendingList.
+subset :: Ord a => [a] -> AscendingList a -> Bool
+subset l1 (AscendingList l2) = all (`isIn` l2) l1
+  where isIn x []               = False
+        isIn x (y:ys) = case x `compare` y of
+                          LT -> False
+                          EQ -> True
+                          GT -> x `isIn` ys
 
 decodeName (N n) = case M.catMaybes [T.stripPrefix "global" n,
                                      T.stripPrefix "Global" n] of
