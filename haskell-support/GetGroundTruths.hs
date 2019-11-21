@@ -9,6 +9,7 @@ import           Control.Monad              (mzero)
 import qualified Data.Aeson                 as A
 import qualified Data.AttoLisp              as L
 import qualified Data.Attoparsec.ByteString as AP
+import qualified Data.BitSet                as Bit
 import qualified Data.ByteString.Char8      as B
 import qualified Data.ByteString.Lazy.Char8 as LB
 import qualified Data.Char                  as C
@@ -35,17 +36,19 @@ import           System.IO.Unsafe           (unsafePerformIO)
 --   value for failed lookups). Since 0 is guaranteed not to appear in any
 --   theorem dependencies, subset checking will still behave correctly.
 theoremDeps :: [(TheoremID, AscendingList Name)]
-encodedDeps :: [(TheoremID, AscendingList Int )]
+encodedDeps :: [(TheoremID, Bit.BitSet    Int )]
 nameMap     :: H.HashMap Name Int
 (theoremDeps, encodedDeps, nameMap) =
     ( map wrapSecond unwrapped
-    , map wrapSecond encoded
+    , map bitSecond  encoded
     , H.fromList (zip names [1..])
     )
   where -- At run time we convert each (already sorted) list of deps into an
         -- 'AscendingList'. This is a newtype so there's minimal overhead.
         wrapSecond :: (a, [b]) -> (a, AscendingList b)
         wrapSecond (t, deps) = (t, AscendingList deps)
+
+        bitSecond (t, deps) = (t, Bit.fromList deps)
 
         -- Build the datastructure at compile time, including sorting the deps
         -- into ascending order. There's no 'Lift' instance for 'AscendingList'
@@ -101,10 +104,10 @@ nameMap     :: H.HashMap Name Int
 nameToInt :: Name -> Int
 nameToInt n = H.lookupDefault 0 n nameMap
 
-theoremFilesAdmittedBy :: AscendingList Name -> [TheoremID]
+theoremFilesAdmittedBy :: [Name] -> [TheoremID]
 theoremFilesAdmittedBy sample = map fst (filter match encodedDeps)
-  where sample' = AscendingList (map nameToInt (unAsc sample))
-        match (_, td) = td `subsetAsc` sample'
+  where sample' = Bit.fromList (map nameToInt sample)
+        match (_, td) = td `Bit.isSubsetOf` sample'
 
 mkResult :: LB.ByteString -> Result
 mkResult = mkResult' . Right . M.fromJust . A.decode
@@ -116,7 +119,7 @@ mkResult' :: Either [Name] [[Name]] -> Result
 mkResult' ns = R { names = ns, theorems = either process nested ns }
   where process :: [Name] -> [TheoremID]
         process [] = []
-        process ns = theoremFilesAdmittedBy (mkAscendingList ns)
+        process ns = theoremFilesAdmittedBy ns
 
         nested :: [[Name]] -> [TheoremID]
         nested []  = []

@@ -1,16 +1,14 @@
 # ML4HSFE executable from its Haskell package, with its test script checked
-{ fetchFromGitHub, fetchurl, haskell, jq, nixpkgs1803, runCommand, unpack,
+{ fetchFromGitHub, fetchurl, haskell, jq, lib, nixpkgs1803, runCommand, unpack,
   withDeps }:
 
 with builtins;
+with lib;
 with rec {
-  getRepo = { name, repo, rev, self, sha256 }:
+  getRepo = { name, owner ? "Warbo", patch ? (x: x), repo, rev, self, sha256 }:
     self.callPackage (nixpkgs1803.haskellPackages.haskellSrc2nix {
       inherit name;
-      src = fetchFromGitHub {
-        inherit repo rev sha256;
-        owner = "Warbo";
-      };
+      src = patch (fetchFromGitHub { inherit owner repo rev sha256; });
     }) {};
 
   # If added to Haskell overrides, will force all packages to be profiled
@@ -32,7 +30,7 @@ with rec {
         (old.overrides or (_: _: {}))
         (self: super:
           with {
-            inherit (haskell.lib) dontCheck;
+            inherit (haskell.lib) doJailbreak dontCheck;
 
             # These nixpkgs definitions come from cabal2nix running with GHC 8,
             # where base contains Semigroup. Since we're using GHC 7, we need to
@@ -45,8 +43,47 @@ with rec {
           lens       = dontCheck super.lens;
           lens-aeson = dontCheck super.lens-aeson;
 
+          # 1.4.8 on Hackage has old version bounds and is incompatible with
+          # integer-gmp >= 1.0
+          bitset = doJailbreak (getRepo {
+            inherit self;
+            name   = "bitset";
+            owner  = "adamczykm";
+            repo   = "bitset";
+            rev    = "2d31c7f";
+            sha256 = "09y4ffr4dbs5l9afsv515zx7w21ifabz8sfyz2qgbsf32vydxn91";
+            patch  = raw: runCommand "bitset-patched"
+              {
+                inherit raw;
+                buildInputs = [ self.hpack ];
+              }
+              ''
+                cp -r "$raw" "$out"
+                chmod +w -R "$out"
+                cd "$out"
+                hpack
+
+                function go {
+                  sed -i "src/Data/BitSet/Generic.hs" -e "s/$1/$2/g"
+                }
+                go ".*Semigroup.*" ""
+                go ".*(<>).*"      ""
+                go ".*mempty.*"    ""
+                go "instance Bits c => Monoid (BitSet c a) where" \
+                   "${concatStrings [
+                      "instance Bits c => Monoid (BitSet c a) where { "
+                      "mempty  = empty; "
+                      "mappend = union; "
+                      "}"
+                    ]}"
+              '';
+          });
+
           # Newer versions depend on QuickCheck >= 2.10
           cassava = self.callHackage "cassava" "0.4.5.1" {};
+
+          # Dependency of bitset
+          conduit = forceSemigroups super.conduit;
 
           # Dependency of ML4HSFE. Note that this needs GHC 7.10, due to changes
           # in GHC's package DB implementation.

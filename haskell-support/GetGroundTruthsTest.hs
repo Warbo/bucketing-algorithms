@@ -24,8 +24,7 @@ import qualified Data.Vector                as V
 import           Debug.Trace                (traceShow)
 import qualified GetGroundTruths            as GGT
 import           GHC.IO.Encoding            (setLocaleEncoding, utf8)
-import           Helper                     (AscendingList (..), Name (..),
-                                             mkAscendingList, sortUniq)
+import           Helper                     (AscendingList (..), Name (..))
 import qualified Helper
 import           Numeric                    (showHex)
 import           Numeric.Natural
@@ -42,19 +41,15 @@ main = do
     , augmentRepNull
     , augmentSize
     , benchmarks
-    , canSortUniq
     , encodeDecode
     , findColon
     , getGroundTruths
     , haveDeps
     , parseEquivalent
     , parseWorks
-    , subset
     ]
 
-parseWorks  = testGroup "Can parse examples" [
-      testProperty "Can stream objects" checkObject
-    ]
+parseWorks  = testProperty "Can stream objects" checkObject
   where checkObject =
           let gen = (,) <$> sized genObj <*> arbitrary
 
@@ -215,7 +210,7 @@ haveDeps = testGroup "Have theorem deps to look up" [
 
         getEnc :: (Helper.TheoremID, [Name], [Name]) -> Property
         getEnc (t, deps, extra) =
-          let got = GGT.theoremFilesAdmittedBy (mkAscendingList (deps ++ extra))
+          let got = GGT.theoremFilesAdmittedBy (deps ++ extra)
            in counterexample (show (("want" , t    )
                                    ,("got"  , got  )
                                    ,("deps" , deps )
@@ -245,22 +240,6 @@ benchmarks = testGroup "Benchmarks" [
 -- Removes dupes and sorts, turning a list of names into valid deps
 fixDeps :: Ord a => [a] -> [a]
 fixDeps = nub . sort
-
-canSortUniq = testProperty "sortUniq sorts and removes dupes" go
-  where go :: [(Natural, Int)] -> Property
-        go given = check (mkWant given) (Helper.sortUniq (fromFreqs given))
-
-        fromFreqs []          = []
-        fromFreqs ((0, _):xs) =     fromFreqs           xs
-        fromFreqs ((n, x):xs) = x : fromFreqs ((n-1, x):xs)
-
-        mkWant :: [(Natural, Int)] -> [Int]
-        mkWant = nub . sort . foldl' add []
-
-        add xs (0, _) =   xs
-        add xs (_, x) = x:xs
-
-        check want (AscendingList got) = want === got
 
 encodeDecode = testGroup "Encoding and decoding names" [
       testProperty "Decode then encode round-trips"     decEnc
@@ -293,24 +272,6 @@ findColon = testProperty "Can find colons" go
                                 next     x === post              .&&.
                                 out      x === ""                .&&.
                                 err      x === []
-
-subset = testGroup "Can find subsets" [
-      testProperty     "Subsets are spotted" spotSubsets,
-      testProperty "Non-subsets are spotted" spotNonSubsets
-    ]
-  where spotSubsets :: Int -> [Int] -> [Int] -> Property
-        spotSubsets x xs indices =
-          let super  = nub (x:xs)
-              super' = mkAscendingList super
-              sub    = mkAscendingList (nub (map get indices))
-              get i  = super !! (abs i `mod` length super)
-           in counterexample (show (("sub", sub), ("super", super)))
-                (property (sub `Helper.subsetAsc` super'))
-
-        spotNonSubsets :: [Int] -> [Int] -> Property
-        spotNonSubsets xs ys = not (null (filter (`notElem` ys) xs)) ==>
-          property (not (mkAscendingList xs `Helper.subsetAsc`
-                         mkAscendingList ys))
 
 -- Helpers
 
@@ -650,9 +611,6 @@ genSpace n          = do c  <- elements " \n\t"
                          cs <- genSpace (min (n - 1) 20)
                          return (c : cs)
 
-genName :: Gen String
-genName = nameToString <$> arbitrary
-
 nameToString (Helper.N t) = T.unpack t
 
 encodeName (Helper.N t) = Helper.N (T.append (T.pack "global")
@@ -664,9 +622,6 @@ instance Arbitrary Name where
 
 depNames = nub (concatMap get GGT.theoremDeps)
   where get (_, AscendingList deps) = deps
-
-genAscNames :: Int -> Gen (AscendingList Name)
-genAscNames n = mkAscendingList . nub <$> vectorOf n arbitrary
 
 -- | Generate a String of JSON, with a few restrictions. In particular, we don't
 --   (yet) bother randomising the whitespace, we don't generate floats or

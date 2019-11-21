@@ -6,7 +6,10 @@ with rec {
   # Takes a "Main" file and compiles it, with some fixed dependencies
   buildMain = { deps, name, profile ? false, script, test ? false }:
     with rec {
-      ghc  = ghcWithML4HSFE { inherit profile; extraPkgs = [ "criterion" ]; };
+      ghc  = ghcWithML4HSFE {
+        inherit profile;
+        extraPkgs = [ "bitset" "criterion" ];
+      };
 
       code = attrsToDirs' "get-ground-truths-src" {
         "GetGroundTruths.hs" = ../haskell-support/GetGroundTruths.hs;

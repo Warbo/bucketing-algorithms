@@ -62,18 +62,6 @@ newtype AscendingList a = AscendingList { unAsc :: [a] } deriving (Eq, Show)
 mkAscendingList :: Ord a => [a] -> AscendingList a
 mkAscendingList = AscendingList . List.sort
 
--- | Check whether the first AscendingList is a subset of the second. This is
---   faster than comparing with (one or two) unordered lists, since we can
---   discard small elements as they're encountered, knowing they won't appear
---   further down the lists.
-subsetAsc :: Ord a => AscendingList a -> AscendingList a -> Bool
-subsetAsc (AscendingList l1) (AscendingList l2) = go l1 l2
-  where go []     _          = True
-        go _      []         = False
-        go a@(x:xs) b@(y:ys) = case x `compare` y of
-                                 LT -> False
-                                 EQ -> go xs b
-                                 GT -> go a  ys
 -- | Check whether the given list is a subset of the AscendingList. This is
 --   faster than comparing with two unordered lists, since we can short-circuit
 --   when small values aren't found near the start of the AscendingList.
@@ -125,12 +113,3 @@ sampleResultToJSON r = A.object [
     "sampleNames"    A..= either A.toJSON A.toJSON (names r)
   , "sampleTheorems" A..= A.toJSON (theorems r)
   ]
-
-sortUniq :: forall a. Ord a => [a] -> AscendingList a
-sortUniq = AscendingList . List.foldl' insertIfMissing []
-  where insertIfMissing :: Ord a => [a] -> a -> [a]
-        insertIfMissing []     x = [x]
-        insertIfMissing (y:ys) x = case x `compare` y of
-                                     LT -> x:y:ys
-                                     EQ ->   y:ys
-                                     GT ->   y:insertIfMissing ys x
