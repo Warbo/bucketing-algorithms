@@ -16,6 +16,7 @@ with rec {
     vars  = { LANG = "en_US.UTF-8"; };
     file  = runCommand "process-samples-script${if profile then "prof" else ""}"
       {
+        __noChroot  = true;  # Allow access to symlink targets
         buildInputs = [ (ghcWithML4HSFE { inherit profile; }) ];
         mods        = attrsToDirs' "bucket-proportions-mods" (astsOfModules // {
           "BucketUtil.hs"      = ../haskell-support/BucketUtil.hs;
@@ -37,7 +38,7 @@ with rec {
         });
       }
       ''
-        cp -rLv "$mods" mods
+        cp -rv "$mods" mods
         chmod +w -R mods
         cd mods
         ghc --make ${if profile then "" else "-O2"} -o "$out" Main.hs
