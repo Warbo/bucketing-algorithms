@@ -91,4 +91,15 @@ with rec {
       "${haskellPackages.hp2pretty}/bin/hp2pretty" heap.hp ||
         echo "WARNING: Failed to render SVG heap chart"
     '';
+
+  timeProfile = runCommand "bucketing-time-profile"
+    {
+      prog    =  addBuckets { profile = true;          };
+      samples = makeSamples { maxSize = 10; reps = 10; };
+    }
+    ''
+      mkdir "$out"
+      cd "$out"
+      "$prog" +RTS -p -RTS < "$samples" > /dev/null
+    '';
 }
