@@ -7,6 +7,7 @@ with rec {
   bucketBoundBuilder = { cmds ? [], deps ? {}, main }:
     runCommand "bucket-bound-runner-${main}"
       (tebenchmark.cache // deps // {
+        __noChroot  = true;
         buildInputs = [
           (ghcWithML4HSFE { extraPkgs = [ "hashmap" "lens-aeson" ]; })
         ];
