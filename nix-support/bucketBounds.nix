@@ -9,7 +9,7 @@ with rec {
       (tebenchmark.cache // deps // {
         __noChroot  = true;
         buildInputs = [
-          (ghcWithML4HSFE { extraPkgs = [ "hashmap" "lens-aeson" ]; })
+          (ghcWithML4HSFE { extraPkgs = [ "bitset" "hashmap" "lens-aeson" ]; })
         ];
         src         = attrsToDirs' "bucket-bound-src" {
           "BucketBounds.hs"    = ../haskell-support/BucketBounds.hs;
