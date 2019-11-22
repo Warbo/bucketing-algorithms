@@ -17,7 +17,7 @@ with rec {
     '';
   };
 
-  go = { label ? "results", maxSize ? 100, reps ? 100, deps ? [] }: rec {
+  go = { label ? "results", maxSize ? 100, reps ? 31, deps ? [] }: rec {
     steps = {
       "samples.json" = withDeps deps (makeSamples { inherit maxSize reps; });
 
