@@ -193,19 +193,6 @@ debug msg = do shouldDebug <- lookupEnv "DEBUG"
                  Just "1" -> hPutStrLn stderr msg
                  _        -> pure ()
 
-newtype BufferedIO a = BIO { runBIO :: IO a }
-
-instance Functor BufferedIO where
-  fmap f (BIO x) = BIO (fmap f x)
-
-instance Applicative BufferedIO where
-  pure x = BIO (pure x)
-  (BIO f) <*> (BIO x) = BIO (f <*> x)
-
-instance Monad BufferedIO where
-  return        = pure
-  (BIO x) >>= f = BIO (x >>= (runBIO . f))
-
 -- | Buffered IO implementation of our streaming interface. In particular, this
 --   version reads the whole of stdin into a buffer, then acts on this buffer
 --   from then on. Using a lazy bytestring for our buffer ensures it will be
@@ -216,7 +203,7 @@ instance Monad BufferedIO where
 --  try using two it will cause 'getContents' to be called twice, which will
 --  complain that stdin has been closed (by the first call). That's why there's
 --  an 'IO' wrapper around this.
-buf :: IO (StreamImp BufferedIO)
+buf :: IO (StreamImp IO)
 buf = do -- Read all stdin (lazily) into a local buffer
          b <- LBS.getContents >>= newIORef
          pure $ StreamImp {
@@ -225,15 +212,15 @@ buf = do -- Read all stdin (lazily) into a local buffer
            , getuntil    = \f s -> apply b (getuntil' f s)
 
            -- The following don't use stdin, so we can defer to io
-           , info        = BIO . LBS.hPut stderr . LBS.pack
-           , putchar     = BIO . putChar
-           , putstr      = BIO . LBS.putStr
+           , info        = LBS.hPut stderr . LBS.pack
+           , putchar     = putChar
+           , putstr      = LBS.putStr
            }
   where -- Update the buffer (strictly) and return a value
         apply :: IORef LBS.ByteString
               -> (LBS.ByteString -> (LBS.ByteString, a))
-              -> BufferedIO a
-        apply b f = BIO $ atomicModifyIORef' b f
+              -> IO a
+        apply b f = atomicModifyIORef' b f
 
         getchar' bs = case LBS.uncons bs of
                         Just (c, bs') -> (bs', c)
@@ -376,7 +363,7 @@ streamKeyVals imp f = do c <- skipSpace imp
                                                   ("Rest"  , LBS.take 50 rest)))
   where go first = do mk <- parseOne imp
                       case mk of
-                        Nothing -> putchar imp '}' -- We've hit, and consumed, the '}'
+                        Nothing -> putchar imp '}' -- Hit & consume the '}'
                         Just !k -> do if first
                                          then pure ()
                                          else putchar imp ','

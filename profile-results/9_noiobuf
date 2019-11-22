@@ -1,0 +1,239 @@
+	Fri Nov 22 01:18 2019 Time and Allocation Profiling Report  (Final)
+
+	   Main +RTS -p -RTS
+
+	total time  =        3.88 secs   (3875 ticks @ 1000 us, 1 processor)
+	total alloc = 818,776,864 bytes  (excludes profiling overheads)
+
+COST CENTRE                    MODULE                     %time %alloc
+
+buf.getuntil'.countUntil       BucketUtil                  36.2   24.0
+theoremFilesAdmittedBy.go      GetGroundTruths             24.8   28.7
+parseOne.go                    BucketUtil                  10.8   21.4
+jstring_                       Data.Aeson.Parser.Internal   7.4    8.7
+augmentRun                     GetGroundTruths              4.7    8.3
+theoremFilesAdmittedBy         GetGroundTruths              3.5    0.0
+toJSON                         Helper                       2.9    2.3
+nub                            Helper                       1.8    0.3
+theoremFilesAdmittedBy.sample' GetGroundTruths              1.4    1.6
+hashWithSalt                   Helper                       1.1    0.0
+mkResult                       GetGroundTruths              0.8    1.2
+parseJSON                      Helper                       0.7    1.0
+
+
+                                                                                                individual     inherited
+COST CENTRE                                      MODULE                       no.     entries  %time %alloc   %time %alloc
+
+MAIN                                             MAIN                          83           0    0.0    0.0   100.0  100.0
+ mainIO                                          GetGroundTruths              168           0    0.0    0.0    99.7   99.9
+  main'                                          GetGroundTruths              171           1    0.0    0.0    99.2   99.1
+   main'.go                                      GetGroundTruths              198           0    0.0    0.0    99.2   99.1
+    augmentSize                                  GetGroundTruths              204           6    0.0    0.0    99.2   99.1
+     augmentSize.go                              GetGroundTruths              228           0    0.0    0.0    99.2   99.1
+      augmentRep                                 GetGroundTruths              231           6    0.0    0.0    99.2   99.1
+       goArray                                   GetGroundTruths              238          30    0.2    0.2    99.2   99.1
+        goArray.go                               GetGroundTruths              289          60    0.0    0.0    97.2   97.3
+         putchar                                 BucketUtil                   364          60    0.0    0.0     0.0    0.0
+         goArray.go.key                          GetGroundTruths              300          60    0.0    0.0     0.0    0.0
+          trimKey                                BucketUtil                   301           0    0.0    0.0     0.0    0.0
+           trimKey.go                            BucketUtil                   302           0    0.0    0.0     0.0    0.0
+         goArray.f                               GetGroundTruths              298          60    0.0    0.0    97.2   97.3
+          streamKeyVals                          BucketUtil                   305          60    0.0    0.0    97.2   97.3
+           streamKeyVals.go                      BucketUtil                   312         120    0.3    0.1    97.2   97.3
+            putchar                              BucketUtil                   363         120    0.0    0.0     0.0    0.0
+            trimKey                              BucketUtil                   325           0    0.1    0.0     0.1    0.1
+             trimKey.go                          BucketUtil                   326           0    0.0    0.0     0.0    0.0
+            augmentRun                           GetGroundTruths              323        1200    4.7    8.3    96.6   97.0
+             mkResult                            GetGroundTruths              344           0    0.8    1.2    43.1   42.0
+              parseJSON                          Helper                       348       81400    0.7    1.0     0.7    1.0
+              array_                             Data.Aeson.Parser.Internal   346           0    0.1    0.4     7.4    9.1
+               jstring_                          Data.Aeson.Parser.Internal   347       81400    7.2    8.6     7.2    8.6
+              mkResult'                          GetGroundTruths              345        1200    0.0    0.0    34.2   30.8
+               mkResult'.nested                  GetGroundTruths              351        1200    0.2    0.1    34.2   30.8
+                mkResult'.process                GetGroundTruths              356       11118    0.0    0.0    31.6   30.3
+                 theoremFilesAdmittedBy          GetGroundTruths              357       10121    3.5    0.0    31.6   30.3
+                  theoremFilesAdmittedBy.sample' GetGroundTruths              359       10121    1.4    1.5     3.4    1.8
+                   nameToInt                     GetGroundTruths              360       81400    0.9    0.2     2.0    0.2
+                    hashWithSalt                 Helper                       361       81400    1.1    0.0     1.1    0.0
+                  theoremFilesAdmittedBy.go      GetGroundTruths              358     3471503   24.7   28.6    24.7   28.6
+                nub                              Helper                       354           0    1.8    0.3     2.5    0.4
+                 nub.go                          Helper                       355       34970    0.6    0.1     0.6    0.1
+             toJSON                              Helper                       341        1200    2.9    2.3     3.0    2.4
+              toJSON                             Helper                       362       81400    0.1    0.1     0.1    0.1
+              theorems                           Helper                       350        1200    0.0    0.0     0.0    0.0
+              names                              Helper                       342        1200    0.0    0.0     0.0    0.0
+             parseOne                            BucketUtil                   333        1200    0.0    0.0    45.8   44.3
+              buf                                BucketUtil                   335           0    0.0    0.0    45.8   44.3
+               buf.\                             BucketUtil                   336        1200    0.0    0.0    45.8   44.3
+                buf.apply                        BucketUtil                   337        1200    0.0    0.0    45.8   44.3
+                 buf.getuntil'                   BucketUtil                   338        1200    0.1    0.0    45.8   44.3
+                  buf.getuntil'.countUntil       BucketUtil                   339     5976553   35.3   23.4    45.7   44.3
+                   parseOne.go                   BucketUtil                   340     5976553   10.5   20.9    10.5   20.9
+              getuntil                           BucketUtil                   334        1200    0.0    0.0     0.0    0.0
+             findColon                           GetGroundTruths              328        1200    0.0    0.0     0.1    0.0
+              buf                                BucketUtil                   330           0    0.0    0.0     0.1    0.0
+               buf.apply                         BucketUtil                   331           0    0.1    0.0     0.1    0.0
+                buf.getchar'                     BucketUtil                   332        1200    0.0    0.0     0.0    0.0
+              getchar                            BucketUtil                   329        1200    0.0    0.0     0.0    0.0
+             putstr                              BucketUtil                   324        3600    0.0    0.0     0.0    0.0
+            parseOne                             BucketUtil                   313          60    0.0    0.0     0.2    0.1
+             buf                                 BucketUtil                   315           0    0.0    0.0     0.2    0.1
+              buf.\                              BucketUtil                   316          60    0.0    0.0     0.2    0.1
+               buf.apply                         BucketUtil                   317          60    0.0    0.0     0.2    0.1
+                buf.getuntil'                    BucketUtil                   318        1260    0.1    0.0     0.2    0.1
+                 buf.getuntil'.countUntil        BucketUtil                   319        5460    0.0    0.0     0.1    0.0
+                  parseOne.go                    BucketUtil                   320        5460    0.1    0.0     0.1    0.0
+             getuntil                            BucketUtil                   314          60    0.0    0.0     0.0    0.0
+           putchar                               BucketUtil                   311          60    0.0    0.0     0.0    0.0
+           skipSpace                             BucketUtil                   306         120    0.0    0.0     0.0    0.0
+            buf                                  BucketUtil                   308           0    0.0    0.0     0.0    0.0
+             buf.apply                           BucketUtil                   309           0    0.0    0.0     0.0    0.0
+              buf.getchar'                       BucketUtil                   310         120    0.0    0.0     0.0    0.0
+            getchar                              BucketUtil                   307         120    0.0    0.0     0.0    0.0
+          putstr                                 BucketUtil                   299         120    0.0    0.0     0.0    0.0
+         parseOne                                BucketUtil                   290          30    0.0    0.0     0.0    0.0
+          buf                                    BucketUtil                   292           0    0.0    0.0     0.0    0.0
+           buf.\                                 BucketUtil                   293          90    0.0    0.0     0.0    0.0
+            buf.apply                            BucketUtil                   294          90    0.0    0.0     0.0    0.0
+             buf.getuntil'                       BucketUtil                   295          90    0.0    0.0     0.0    0.0
+              buf.getuntil'.countUntil           BucketUtil                   296         630    0.0    0.0     0.0    0.0
+               parseOne.go                       BucketUtil                   297         630    0.0    0.0     0.0    0.0
+          getuntil                               BucketUtil                   291          90    0.0    0.0     0.0    0.0
+        skipSpace                                BucketUtil                   284          90    0.0    0.0     0.0    0.0
+         buf                                     BucketUtil                   286           0    0.0    0.0     0.0    0.0
+          buf.apply                              BucketUtil                   287           0    0.0    0.0     0.0    0.0
+           buf.getchar'                          BucketUtil                   288          90    0.0    0.0     0.0    0.0
+         getchar                                 BucketUtil                   285          90    0.0    0.0     0.0    0.0
+        putchar                                  BucketUtil                   283          90    0.0    0.0     0.0    0.0
+        goArray.names                            GetGroundTruths              264          30    0.0    0.0     0.0    0.0
+        goArray.(...)                            GetGroundTruths              261          30    0.0    0.0     0.0    0.0
+        goArray.obj                              GetGroundTruths              260          30    0.0    0.0     0.0    0.0
+        goArray.(...)                            GetGroundTruths              253          30    0.0    0.0     0.2    0.3
+         parseJSON                               Helper                       259        2035    0.0    0.0     0.0    0.0
+         object_                                 Data.Aeson.Parser.Internal   255           0    0.0    0.0     0.2    0.2
+          jstring_                               Data.Aeson.Parser.Internal   256        2065    0.2    0.0     0.2    0.2
+           array_                                Data.Aeson.Parser.Internal   258           0    0.1    0.2     0.1    0.2
+        sampleResult                             GetGroundTruths              249           0    0.0    0.0     0.3    0.2
+         mkResult'                               GetGroundTruths              252          30    0.0    0.0     0.2    0.1
+          mkResult'.process                      GetGroundTruths              267          30    0.0    0.0     0.2    0.1
+           theoremFilesAdmittedBy                GetGroundTruths              268          30    0.1    0.0     0.2    0.1
+            theoremFilesAdmittedBy.sample'       GetGroundTruths              275          30    0.0    0.0     0.1    0.0
+             nameToInt                           GetGroundTruths              276        2035    0.0    0.0     0.0    0.0
+              hashWithSalt                       Helper                       277        2035    0.0    0.0     0.0    0.0
+            theoremFilesAdmittedBy.go            GetGroundTruths              273       10290    0.1    0.1     0.1    0.1
+         sampleResultToJSON                      Helper                       250          30    0.2    0.1     0.2    0.1
+          toJSON                                 Helper                       282        2035    0.0    0.0     0.0    0.0
+          theorems                               Helper                       266          30    0.0    0.0     0.0    0.0
+          names                                  Helper                       251          30    0.0    0.0     0.0    0.0
+        putstr                                   BucketUtil                   247          30    0.0    0.0     0.0    0.0
+        parseOne                                 BucketUtil                   239          30    0.0    0.0     1.2    1.1
+         buf                                     BucketUtil                   241           0    0.0    0.0     1.2    1.1
+          buf.\                                  BucketUtil                   242          30    0.0    0.0     1.2    1.1
+           buf.apply                             BucketUtil                   243          30    0.0    0.0     1.2    1.1
+            buf.getuntil'                        BucketUtil                   244          30    0.0    0.0     1.2    1.1
+             buf.getuntil'.countUntil            BucketUtil                   245      149313    0.9    0.6     1.2    1.1
+              parseOne.go                        BucketUtil                   246      149313    0.3    0.5     0.3    0.5
+         getuntil                                BucketUtil                   240          30    0.0    0.0     0.0    0.0
+       putchar                                   BucketUtil                   237          30    0.0    0.0     0.0    0.0
+       skipSpace                                 BucketUtil                   232          90    0.0    0.0     0.0    0.0
+        buf                                      BucketUtil                   234           0    0.0    0.0     0.0    0.0
+         buf.apply                               BucketUtil                   235           0    0.0    0.0     0.0    0.0
+          buf.getchar'                           BucketUtil                   236          90    0.0    0.0     0.0    0.0
+        getchar                                  BucketUtil                   233          90    0.0    0.0     0.0    0.0
+      putstr                                     BucketUtil                   229          30    0.0    0.0     0.0    0.0
+     streamKeyVals                               BucketUtil                   206           6    0.0    0.0     0.0    0.0
+      streamKeyVals.go                           BucketUtil                   213          12    0.0    0.0     0.0    0.0
+       putchar                                   BucketUtil                   365          12    0.0    0.0     0.0    0.0
+       trimKey                                   BucketUtil                   226           0    0.0    0.0     0.0    0.0
+        trimKey.go                               BucketUtil                   227           0    0.0    0.0     0.0    0.0
+       augmentSize.go                            GetGroundTruths              224          30    0.0    0.0     0.0    0.0
+        putstr                                   BucketUtil                   225          30    0.0    0.0     0.0    0.0
+       parseOne                                  BucketUtil                   214           6    0.0    0.0     0.0    0.0
+        buf                                      BucketUtil                   216           0    0.0    0.0     0.0    0.0
+         buf.\                                   BucketUtil                   217           6    0.0    0.0     0.0    0.0
+          buf.apply                              BucketUtil                   218           6    0.0    0.0     0.0    0.0
+           buf.getuntil'                         BucketUtil                   219          36    0.0    0.0     0.0    0.0
+            buf.getuntil'.countUntil             BucketUtil                   220         120    0.0    0.0     0.0    0.0
+             parseOne.go                         BucketUtil                   221         120    0.0    0.0     0.0    0.0
+        getuntil                                 BucketUtil                   215           6    0.0    0.0     0.0    0.0
+      putchar                                    BucketUtil                   212           6    0.0    0.0     0.0    0.0
+      skipSpace                                  BucketUtil                   207          12    0.0    0.0     0.0    0.0
+       buf                                       BucketUtil                   209           0    0.0    0.0     0.0    0.0
+        buf.apply                                BucketUtil                   210           0    0.0    0.0     0.0    0.0
+         buf.getchar'                            BucketUtil                   211          12    0.0    0.0     0.0    0.0
+       getchar                                   BucketUtil                   208          12    0.0    0.0     0.0    0.0
+    putstr                                       BucketUtil                   203           6    0.0    0.0     0.0    0.0
+    info                                         BucketUtil                   199           1    0.0    0.0     0.0    0.0
+   streamKeyVals                                 BucketUtil                   173           1    0.0    0.0     0.0    0.0
+    streamKeyVals.go                             BucketUtil                   182           2    0.0    0.0     0.0    0.0
+     putchar                                     BucketUtil                   366           2    0.0    0.0     0.0    0.0
+     trimKey                                     BucketUtil                   195           0    0.0    0.0     0.0    0.0
+      trimKey.go                                 BucketUtil                   197           0    0.0    0.0     0.0    0.0
+     main'.go                                    GetGroundTruths              193           6    0.0    0.0     0.0    0.0
+      putstr                                     BucketUtil                   202           6    0.0    0.0     0.0    0.0
+     parseOne                                    BucketUtil                   183           1    0.0    0.0     0.0    0.0
+      buf                                        BucketUtil                   185           0    0.0    0.0     0.0    0.0
+       buf.\                                     BucketUtil                   186           1    0.0    0.0     0.0    0.0
+        buf.apply                                BucketUtil                   187           1    0.0    0.0     0.0    0.0
+         buf.getuntil'                           BucketUtil                   188           7    0.0    0.0     0.0    0.0
+          buf.getuntil'.countUntil               BucketUtil                   189          30    0.0    0.0     0.0    0.0
+           parseOne.go                           BucketUtil                   190          30    0.0    0.0     0.0    0.0
+      getuntil                                   BucketUtil                   184           1    0.0    0.0     0.0    0.0
+    putchar                                      BucketUtil                   181           1    0.0    0.0     0.0    0.0
+    skipSpace                                    BucketUtil                   174           1    0.0    0.0     0.0    0.0
+     buf                                         BucketUtil                   177           0    0.0    0.0     0.0    0.0
+      buf.apply                                  BucketUtil                   178           0    0.0    0.0     0.0    0.0
+       buf.getchar'                              BucketUtil                   179           1    0.0    0.0     0.0    0.0
+     getchar                                     BucketUtil                   175           1    0.0    0.0     0.0    0.0
+  buf                                            BucketUtil                   170           0    0.5    0.8     0.5    0.8
+   buf.apply                                     BucketUtil                   176           1    0.0    0.0     0.0    0.0
+ CAF                                             Main                         165           0    0.0    0.0     0.0    0.0
+  main                                           Main                         166           1    0.0    0.0     0.0    0.0
+ CAF                                             GetGroundTruths              164           0    0.0    0.0     0.1    0.1
+  mkResult'.nested                               GetGroundTruths              352           0    0.0    0.0     0.0    0.0
+   nub                                           Helper                       353           1    0.0    0.0     0.0    0.0
+  mkResult                                       GetGroundTruths              343           1    0.0    0.0     0.0    0.0
+  augmentRun                                     GetGroundTruths              327           0    0.0    0.0     0.0    0.0
+  nameMap                                        GetGroundTruths              278           1    0.0    0.0     0.0    0.0
+  (...)                                          GetGroundTruths              270           1    0.0    0.0     0.1    0.1
+   hashWithSalt                                  Helper                       280         182    0.0    0.0     0.0    0.0
+   (...).names                                   GetGroundTruths              279           1    0.0    0.0     0.0    0.0
+   (...).bitSecond                               GetGroundTruths              274         343    0.0    0.0     0.0    0.0
+   (...).(...)                                   GetGroundTruths              272           1    0.1    0.1     0.1    0.1
+   (...).encoded                                 GetGroundTruths              271           1    0.0    0.0     0.0    0.0
+  encodedDeps                                    GetGroundTruths              269           1    0.0    0.0     0.0    0.0
+  goArray                                        GetGroundTruths              262           0    0.0    0.0     0.0    0.0
+   goArray.go                                    GetGroundTruths              303           0    0.0    0.0     0.0    0.0
+    goArray.f                                    GetGroundTruths              304           0    0.0    0.0     0.0    0.0
+     streamKeyVals                               BucketUtil                   321           0    0.0    0.0     0.0    0.0
+      streamKeyVals.go                           BucketUtil                   322           0    0.0    0.0     0.0    0.0
+   goArray.(...)                                 GetGroundTruths              263           0    0.0    0.0     0.0    0.0
+  sampleResult                                   GetGroundTruths              248           1    0.0    0.0     0.0    0.0
+  augmentSize                                    GetGroundTruths              205           0    0.0    0.0     0.0    0.0
+   augmentSize.go                                GetGroundTruths              230           0    0.0    0.0     0.0    0.0
+   streamKeyVals                                 BucketUtil                   222           0    0.0    0.0     0.0    0.0
+    streamKeyVals.go                             BucketUtil                   223           0    0.0    0.0     0.0    0.0
+  main'                                          GetGroundTruths              172           0    0.0    0.0     0.0    0.0
+   main'.go                                      GetGroundTruths              201           0    0.0    0.0     0.0    0.0
+   streamKeyVals                                 BucketUtil                   191           0    0.0    0.0     0.0    0.0
+    streamKeyVals.go                             BucketUtil                   192           0    0.0    0.0     0.0    0.0
+  mainIO                                         GetGroundTruths              167           1    0.0    0.0     0.0    0.0
+ CAF                                             BucketUtil                   163           0    0.0    0.0     0.0    0.0
+  trimKey                                        BucketUtil                   194           1    0.0    0.0     0.0    0.0
+   trimKey.go                                    BucketUtil                   196           1    0.0    0.0     0.0    0.0
+  skipSpace                                      BucketUtil                   180           0    0.0    0.0     0.0    0.0
+  buf                                            BucketUtil                   169           1    0.0    0.0     0.0    0.0
+ CAF                                             Helper                       162           0    0.0    0.0     0.0    0.0
+  toJSON                                         Helper                       349           0    0.0    0.0     0.0    0.0
+  ==                                             Helper                       281           1    0.0    0.0     0.0    0.0
+  sampleResultToJSON                             Helper                       265           0    0.0    0.0     0.0    0.0
+ CAF                                             Data.Aeson.Types.FromJSON    158           0    0.0    0.0     0.0    0.0
+ CAF                                             Data.Aeson.Parser.Internal   157           0    0.0    0.0     0.0    0.0
+  array_                                         Data.Aeson.Parser.Internal   257           1    0.0    0.0     0.0    0.0
+  object_                                        Data.Aeson.Parser.Internal   254           1    0.0    0.0     0.0    0.0
+ CAF                                             Data.Vector                  153           0    0.0    0.0     0.0    0.0
+ CAF                                             GHC.IO.Encoding              132           0    0.2    0.0     0.2    0.0
+ CAF                                             GHC.IO.Encoding.Iconv        131           0    0.0    0.0     0.0    0.0
+ CAF                                             GHC.IO.Handle.FD             129           0    0.0    0.0     0.0    0.0
+ CAF                                             GHC.Conc.Signal              121           0    0.0    0.0     0.0    0.0
+ CAF                                             GHC.Integer.Type              90           0    0.0    0.0     0.0    0.0

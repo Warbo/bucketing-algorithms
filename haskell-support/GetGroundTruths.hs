@@ -198,5 +198,4 @@ main' imp = BU.streamKeyVals imp go
                      augmentSize imp
 
 -- | Read stdin into a lazy buffer then stream from it
-mainIO = do imp <- BU.buf
-            BU.runBIO (main' imp)
+mainIO = BU.buf >>= main'
