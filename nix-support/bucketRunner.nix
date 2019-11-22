@@ -5,8 +5,9 @@
 { buildInputs, files ? {}, mod, name }: runCommand name
   {
     inherit buildInputs;
-    files = attrsToDirs' "${name}-files" files;
-    main  = writeScript "${name}-main.hs" ''
+    __noChroot = true;
+    files      = attrsToDirs' "${name}-files" files;
+    main       = writeScript "${name}-main.hs" ''
       {-# LANGUAGE OverloadedStrings #-}
       module Main where
       import           BucketUtil

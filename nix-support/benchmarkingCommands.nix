@@ -20,7 +20,8 @@ rec {
     file = runCommand "${name}-compiled"
       {
         inherit buildInputs;
-        main  = writeScript "${name}-main.hs" ''
+        __noChroot = true;
+        main       = writeScript "${name}-main.hs" ''
           module Main where
 
           import qualified AstsOf

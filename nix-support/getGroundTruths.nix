@@ -21,7 +21,11 @@ with rec {
       };
     };
     runCommand "get-ground-truths-${name}"
-      (tebenchmark.cache // deps // { inherit code; buildInputs = [ ghc ]; })
+      (tebenchmark.cache // deps // {
+        inherit code;
+        __noChroot  = true;
+        buildInputs = [ ghc ];
+      })
       ''
         cp "$code"/*.hs ./
         ${script}
