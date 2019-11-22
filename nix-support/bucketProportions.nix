@@ -37,7 +37,7 @@ with rec {
         });
       }
       ''
-        cp -rv "$mods" mods
+        cp -rLv "$mods" mods
         chmod +w -R mods
         cd mods
         ghc --make ${if profile then "" else "-O2"} -o "$out" Main.hs
