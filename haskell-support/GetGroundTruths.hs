@@ -105,9 +105,11 @@ nameToInt :: Name -> Int
 nameToInt n = H.lookupDefault 0 n nameMap
 
 theoremFilesAdmittedBy :: [Name] -> [TheoremID]
-theoremFilesAdmittedBy sample = map fst (filter match encodedDeps)
-  where sample' = Bit.fromList (map nameToInt sample)
-        match (_, td) = td `Bit.isSubsetOf` sample'
+theoremFilesAdmittedBy sample = List.foldl' go [] encodedDeps
+  where go tids (tid, deps) = if deps `Bit.isSubsetOf` sample'
+                                 then tid:tids
+                                 else tids
+        sample' = Bit.fromList (map nameToInt sample)
 
 mkResult :: LB.ByteString -> Result
 mkResult = mkResult' . Right . M.fromJust . A.decode
