@@ -1,0 +1,23 @@
+# Theory Exploration Benchmark Groud Truth Recall #
+
+These results come from `nix-support/proportionExperiment.nix`. They should be
+deterministic, and hence easily reproducible, but are saved here because they
+take a long time to run (around a day). The files are:
+
+samples.json.lz: Sets of names sampled from the Theory Exploration Benchmark.
+
+withBuckets.json.lz: The same samples, but bucketed pseudorandomly (AKA hashed)
+and using recurrent clustering.
+
+withBucketsGroundTruths.json.lz: The same buckets, annotated with the theorems
+which are possible to find if they were explored.
+
+withBucketsGroundTruthProportions.msgpack.lz: The same buckets, annotated with
+the proportion of each sample's theorems that remain possible to find when
+bucketed.
+
+averageBucketProportions.msgpack.lz: The same proportions, averaged.
+
+bucketBounds.json.lz: Samples taken from haskell-te repository, bucketed
+optimally and pessimally using constraint satisfaction, annotated with ground
+truth proportions.
