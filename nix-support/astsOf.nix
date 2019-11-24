@@ -17,6 +17,7 @@ with rec {
 
   script = runCommand "astsOf"
     {
+      __noChroot  = true;
       modules     = attrsToDirs' "AstsOfModules" modules;
       buildInputs = [
         (haskellPackages.ghcWithPackages (h: [
